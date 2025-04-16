@@ -1,165 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mini‑Animator</title>
-  <style>
-    :root {
-      --panel-bg: #1e1e1e; --panel-fg: #fff; --accent: #4ade80;
-      --toolbar-h: 56px;
-    }
-    * { box-sizing:border-box; user-select:none; -webkit-tap-highlight-color:transparent }
-    body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:#111; color:var(--panel-fg); height:100vh; display:flex; flex-direction:column }
-    header { height:var(--toolbar-h); background:var(--panel-bg); display:flex; align-items:center; padding:0 .5rem; gap:.25rem; flex-wrap:wrap }
-    header button, header input[type="color"], header input[type="number"] { border:none; padding:.4rem .6rem; border-radius:.5rem; background:#333; color:#fff; font-size:.9rem }
-    header button.active { background:var(--accent); color:#000 }
-    header input[type="number"] { width:4rem }
-    main { flex:1; display:flex; flex-direction:row; overflow:hidden }
-    #frames { width:120px; background:#141414; overflow-y:auto; padding:.25rem; display:flex; flex-direction:column; gap:.25rem }
-    .thumb { width:100%; aspect-ratio:4/3; border:2px solid #444; cursor:grab; position:relative }
-    .thumb.active { border-color:var(--accent) }
-    #canvasWrap { flex:1; display:flex; justify-content:center; align-items:center; background:#222; position:relative }
-    #draw { background:#fff; touch-action:none }
-    #selectBox { position:absolute; border:2px dashed var(--accent); pointer-events:none; display:none }
-    #onionPrev,#onionNext{position:absolute;opacity:.3;pointer-events:none;display:none}
-    @media (max-width:700px){ main{flex-direction:column} #frames{flex-direction:row;width:100%;height:100px;overflow-x:auto;overflow-y:hidden} .thumb{width:100px;height:auto} }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini‑Animator v2</title>
+<style>
+ :root{--dark:#1e1e1e;--mid:#2b2b2b;--light:#fafafa;--accent:#4ade80;--tool-h:54px}
+ *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+ body{height:100vh;display:flex;flex-direction:column;background:#111;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:var(--light)}
+ header{height:var(--tool-h);background:var(--dark);display:flex;align-items:center;gap:.35rem;padding:0 .5rem;flex-wrap:wrap}
+ header button,header input[type=color],header input[type=number]{border:none;background:var(--mid);color:var(--light);padding:.4rem .6rem;border-radius:.5rem;font-size:.85rem}
+ header button.active{background:var(--accent);color:#000}
+ header label{display:flex;align-items:center;gap:.2rem}
+ main{flex:1;display:flex;overflow:hidden}
+ #frames{width:124px;background:#141414;overflow-y:auto;padding:.3rem;display:flex;flex-direction:column;gap:.3rem}
+ .thumb{width:100%;aspect-ratio:4/3;border:2px solid #444;cursor:grab;position:relative;border-radius:.3rem}
+ .thumb.active{border-color:var(--accent)}
+ #stage{flex:1;display:flex;justify-content:center;align-items:center;background:#222;position:relative;touch-action:none}
+ #view{background:transparent;touch-action:none}
+ .onion{position:absolute;top:0;left:0;opacity:.25;pointer-events:none}
+ #selBox{position:absolute;border:2px dashed var(--accent);pointer-events:none;display:none}
+ @media(max-width:700px){main{flex-direction:column}#frames{flex-direction:row;width:100%;height:108px;overflow-x:auto;overflow-y:hidden}.thumb{width:108px;height:auto}}
+</style>
 </head>
 <body>
-  <header>
-    <button id="penBtn" title="Pen">✏️</button>
-    <button id="eraserBtn" title="Eraser">🩹</button>
-    <button id="bucketBtn" title="Paint Bucket">🪣</button>
-    <button id="selectBtn" title="Select">🔲</button>
-    <button id="undoBtn" title="Undo">↶</button>
-    <button id="addFrameBtn" title="Add Frame">➕ Frame</button>
-    <button id="delFrameBtn" title="Delete Frame">🗑️ Frame</button>
-    <button id="playBtn" title="Preview">▶️</button>
-    <label>FPS <input id="fpsInput" type="number" min="1" max="60" value="12"></label>
-    <input id="bgColor" type="color" value="#ffffff" title="Background Color" />
-    <input id="bgImgInput" type="file" accept="image/*" style="display:none" />
-    <button id="bgImgBtn" title="Background Image">🖼️ BG</button>
-
-    <input id="importInput" type="file" accept="image/*" style="display:none" />
-    <button id="importBtn" title="Import Image">📥 Img</button>
-    <button id="saveBtn" title="Save">💾</button>
-    <input id="loadInput" type="file" accept="application/json" style="display:none" />
-    <button id="loadBtn" title="Load">📂</button>
-    <button id="exportBtn" title="Download mp4">📹</button>
-  </header>
-
-  <main>
-    <div id="frames"></div>
-    <div id="canvasWrap">
-      <canvas id="onionPrev"></canvas>
-      <canvas id="onionNext"></canvas>
-      <canvas id="draw" width="800" height="600"></canvas>
-      <div id="selectBox"></div>
-    </div>
-  </main>
-
-  <script>
-    /* ===================  Globals & State  ==================== */
-    const canvas = document.getElementById('draw');
-    const ctx = canvas.getContext('2d');
-    const onionPrev = document.getElementById('onionPrev');
-    const onionNext = document.getElementById('onionNext');
-    const onionPrevCtx = onionPrev.getContext('2d');
-    const onionNextCtx = onionNext.getContext('2d');
-    const framesEl = document.getElementById('frames');
-    const selectBox = document.getElementById('selectBox');
-
-    let tool = 'pen';
-    let drawing = false;
-    let startX=0,startY=0;
-    let currentFrame = 0;
-    let frames = [{bg:{color:'#ffffff',img:null},layers:[ctx.getImageData(0,0,canvas.width,canvas.height)]}];
-    let undoStack = [];
-    let fps = 12;
-    let selection = null; // {x,y,w,h,img}
-
-    /* ===================  Utility Functions  ==================== */
-    function snapshot() { // push current canvas state
-      undoStack.push(canvas.toDataURL());
-      if(undoStack.length>50) undoStack.shift();
-    }
-    function setActive(btn){ document.querySelectorAll('header button').forEach(b=>b.classList.remove('active')); if(btn) btn.classList.add('active'); }
-
-    /* ===================  Drawing & Tools  ==================== */
-    function pointerDown(e){
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX||e.touches[0].clientX) - rect.left;
-      const y = (e.clientY||e.touches[0].clientY) - rect.top;
-      startX=x; startY=y;
-      drawing = true;
-      if(tool==='pen'||tool==='eraser'){ snapshot(); ctx.beginPath(); ctx.moveTo(x,y); }
-      if(tool==='select'){ selection=null; selectBox.style.display='block'; selectBox.style.left=x+'px'; selectBox.style.top=y+'px'; selectBox.style.width='0px'; selectBox.style.height='0px'; }
-      if(tool==='bucket'){ snapshot(); floodFill(x,y); }
-    }
-    function pointerMove(e){ if(!drawing) return; const rect=canvas.getBoundingClientRect(); const x=(e.clientX||e.touches[0].clientX)-rect.left; const y=(e.clientY||e.touches[0].clientY)-rect.top;
-      if(tool==='pen'){ ctx.lineTo(x,y); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke(); }
-      if(tool==='eraser'){ ctx.globalCompositeOperation='destination-out'; ctx.lineTo(x,y); ctx.lineWidth=20; ctx.stroke(); ctx.globalCompositeOperation='source-over'; }
-      if(tool==='select'){ const w=x-startX, h=y-startY; selectBox.style.width=Math.abs(w)+'px'; selectBox.style.height=Math.abs(h)+'px'; selectBox.style.left=(w<0?x:startX)+'px'; selectBox.style.top=(h<0?y:startY)+'px'; }
-    }
-    function pointerUp(e){ drawing=false; if(tool==='pen'||tool==='eraser'){ ctx.closePath(); saveFrame(); }
-      if(tool==='select'){ const rect=selectBox.getBoundingClientRect(); if(rect.width>0&&rect.height>0){ selection={x:rect.left-canvas.getBoundingClientRect().left,y:rect.top-canvas.getBoundingClientRect().top,w:rect.width,h:rect.height,img:ctx.getImageData(rect.left-canvas.getBoundingClientRect().left,rect.top-canvas.getBoundingClientRect().top,rect.width,rect.height)}; }
-        selectBox.style.display='none'; }
-    }
-
-    canvas.addEventListener('mousedown',pointerDown);canvas.addEventListener('mousemove',pointerMove);canvas.addEventListener('mouseup',pointerUp);
-    canvas.addEventListener('touchstart',pointerDown,{passive:false});canvas.addEventListener('touchmove',pointerMove,{passive:false});canvas.addEventListener('touchend',pointerUp);
-
-    /* ===================  Flood Fill  ==================== */
-    function floodFill(x,y){ const imgData=ctx.getImageData(0,0,canvas.width,canvas.height); const data=imgData.data; const targetColor=getColorAt(x,y,data);
-      const fillColor=[0,0,0,255]; if(colorsMatch(targetColor,fillColor)) return; const stack=[[x,y]]; while(stack.length){ const [cx,cy]=stack.pop(); let idx=(cy*canvas.width+cx)*4; while(cy>=0&&colorsMatch(getColorAt(cx,cy,data),targetColor)){ cy--; }
-      cy++; let reachLeft=false,reachRight=false; while(cy<canvas.height&&colorsMatch(getColorAt(cx,cy,data),targetColor)){ setColorAt(cx,cy,data,fillColor); if(cx>0){ if(colorsMatch(getColorAt(cx-1,cy,data),targetColor)){ if(!reachLeft){ stack.push([cx-1,cy]); reachLeft=true; } } else reachLeft=false; }
-        if(cx<canvas.width-1){ if(colorsMatch(getColorAt(cx+1,cy,data),targetColor)){ if(!reachRight){ stack.push([cx+1,cy]); reachRight=true; } } else reachRight=false; }
-        cy++; idx+=canvas.width*4; }
-      }
-      ctx.putImageData(imgData,0,0); saveFrame(); }
-    function getColorAt(x,y,data){ const idx=(y*canvas.width+x)*4; return data.slice(idx,idx+4); }
-    function setColorAt(x,y,data,color){ const idx=(y*canvas.width+x)*4; for(let i=0;i<4;i++) data[idx+i]=color[i]; }
-    function colorsMatch(a,b){ return a[0]==b[0]&&a[1]==b[1]&&a[2]==b[2]&&a[3]==b[3]; }
-
-    /* ===================  Frames ==================== */
-    function saveFrame(){ frames[currentFrame].layers[0]=ctx.getImageData(0,0,canvas.width,canvas.height); updateThumb(currentFrame); }
-    function addFrame(){ currentFrame=frames.push({bg:{...frames[currentFrame].bg},layers:[ctx.createImageData(canvas.width,canvas.height)]})-1; drawFrame(); buildThumbs(); }
-    function deleteFrame(){ if(frames.length>1){ frames.splice(currentFrame,1); currentFrame=Math.max(0,currentFrame-1); buildThumbs(); drawFrame(); } }
-    function buildThumbs(){ framesEl.innerHTML=''; frames.forEach((f,i)=>{ const c=document.createElement('canvas'); c.width=160; c.height=120; const tctx=c.getContext('2d'); tctx.fillStyle=f.bg.color; tctx.fillRect(0,0,c.width,c.height); tctx.putImageData(f.layers[0],0,0); c.className='thumb'+(i===currentFrame?' active':''); c.draggable=true;
-        c.addEventListener('click',()=>{ currentFrame=i; drawFrame(); buildThumbs(); }); c.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/plain',i); }); c.addEventListener('dragover',e=>e.preventDefault()); c.addEventListener('drop',e=>{ const from=+e.dataTransfer.getData('text/plain'); const to=i; const item=frames.splice(from,1)[0]; frames.splice(to,0,item); currentFrame=to; buildThumbs(); }); framesEl.appendChild(c); }); }
-    function updateThumb(i){ const c=framesEl.children[i]; if(!c) return; const tctx=c.getContext('2d'); tctx.fillStyle=frames[i].bg.color; tctx.fillRect(0,0,c.width,c.height); tctx.putImageData(frames[i].layers[0],0,0); }
-    function drawFrame(){ const f=frames[currentFrame]; ctx.putImageData(f.layers[0],0,0); if(f.bg.img){ ctx.drawImage(f.bg.img,0,0,canvas.width,canvas.height); } onionPrev.style.display=onionNext.style.display='none'; if(currentFrame>0){ onionPrevCtx.putImageData(frames[currentFrame-1].layers[0],0,0); onionPrev.style.display='block'; } if(currentFrame<frames.length-1){ onionNextCtx.putImageData(frames[currentFrame+1].layers[0],0,0); onionNext.style.display='block'; }
-      buildThumbs(); }
-
-    /* ===================  UI Events ==================== */
-    penBtn.onclick=()=>{tool='pen';setActive(penBtn)}; eraserBtn.onclick=()=>{tool='eraser';setActive(eraserBtn)}; bucketBtn.onclick=()=>{tool='bucket';setActive(bucketBtn)}; selectBtn.onclick=()=>{tool='select';setActive(selectBtn)};
-    undoBtn.onclick=()=>{ if(undoStack.length){ const img=new Image(); img.onload=()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); saveFrame(); }; img.src=undoStack.pop(); } };
-    addFrameBtn.onclick=addFrame; delFrameBtn.onclick=deleteFrame;
-    fpsInput.onchange=()=>fps=+fpsInput.value;
-    playBtn.onclick=preview;
-    importBtn.onclick=()=>importInput.click(); importInput.onchange=e=>{ const file=e.target.files[0]; if(!file)return; const img=new Image(); img.onload=()=>{ snapshot(); ctx.drawImage(img,0,0,canvas.width,canvas.height); saveFrame(); }; img.src=URL.createObjectURL(file); };
-    bgImgBtn.onclick=()=>bgImgInput.click(); bgImgInput.onchange=e=>{ const file=e.target.files[0]; if(!file)return; const img=new Image(); img.onload=()=>{ frames[currentFrame].bg.img=img; drawFrame(); }; img.src=URL.createObjectURL(file); };
-    bgColor.onchange=e=>{ frames[currentFrame].bg.color=e.target.value; drawFrame(); };
-    saveBtn.onclick=()=>{ const data={frames:frames.map(f=>({bg:{color:f.bg.color,img:f.bg.img?f.bg.img.src:null},layer:canvas.toDataURL()})),fps}; const blob=new Blob([JSON.stringify(data)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='animation.json'; a.click(); };
-    loadBtn.onclick=()=>loadInput.click(); loadInput.onchange=e=>{ const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=ev=>{ const data=JSON.parse(ev.target.result); frames=[]; Promise.all(data.frames.map(f=>new Promise(res=>{ const c=document.createElement('canvas'); c.width=canvas.width; c.height=canvas.height; const ctx2=c.getContext('2d'); const img=new Image(); img.onload=()=>{ ctx2.drawImage(img,0,0); res(ctx2.getImageData(0,0,c.width,c.height)); }; img.src=f.layer; }))).then(arr=>{ data.frames.forEach((f,i)=>{ frames[i]={bg:{color:f.bg.color,img:f.bg.img?Object.assign(new Image(),{src:f.bg.img}):null},layers:[arr[i]]}; }); currentFrame=0; fps=data.fps; fpsInput.value=fps; buildThumbs(); drawFrame(); }); }; reader.readAsText(file); };
-    exportBtn.onclick=exportMP4;
-
-    /* ===================  Preview & Export  ==================== */
-    function preview(){ let idx=0; playBtn.disabled=true; const interval=setInterval(()=>{ currentFrame=idx; drawFrame(); idx=(idx+1)%frames.length; },1000/fps); setTimeout(()=>{ clearInterval(interval); playBtn.disabled=false; drawFrame(); },frames.length*1000/fps*2); }
-
-    async function exportMP4(){ const off=document.createElement('canvas'); off.width=canvas.width; off.height=canvas.height; const offCtx=off.getContext('2d'); const stream=off.captureStream(fps); const mediaRecorder=new MediaRecorder(stream,{mimeType:'video/webm'}); const chunks=[]; mediaRecorder.ondataavailable=e=>chunks.push(e.data);
-      mediaRecorder.start(); for(const f of frames){ offCtx.fillStyle=f.bg.color; offCtx.fillRect(0,0,off.width,off.height); if(f.bg.img) offCtx.drawImage(f.bg.img,0,0,off.width,off.height); offCtx.putImageData(f.layers[0],0,0); await new Promise(r=>setTimeout(r,1000/fps)); }
-      mediaRecorder.stop(); mediaRecorder.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='animation.webm'; a.click(); } }
-
-    /* ===================  Service Worker Cache  ==================== */
-    if('serviceWorker' in navigator){ const swCode=`self.addEventListener('install',e=>{e.waitUntil(caches.open('mini-anim').then(c=>c.addAll(['./'])))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))})`; const blob=new Blob([swCode],{type:'text/javascript'}); const swUrl=URL.createObjectURL(blob); navigator.serviceWorker.register(swUrl); }
-
-    /* ===================  Init  ==================== */
-    setActive(penBtn); buildThumbs(); drawFrame();
-  </script>
+<header>
+ <!-- tools -->
+ <button id="penBtn" title="Pen">✏️</button>
+ <button id="eraserBtn" title="Eraser">🩹</button>
+ <button id="bucketBtn" title="Paint Bucket">🪣</button>
+ <button id="selBtn" title="Select area">🔲</button>
+ <input id="colPick" type="color" value="#000000" title="Color" />
+ <button id="undoBtn" title="Undo">↶</button>
+ <!-- frames -->
+ <button id="addF">➕ Frame</button>
+ <button id="delF">🗑️ Frame</button>
+ <label>FPS<input id="fps" type="number" min="1" max="60" value="12"></label>
+ <button id="play" title="Preview">▶️</button>
+ <!-- background -->
+ <input id="bgClr" type="color" value="#ffffff" title="Background color" />
+ <input id="bgImgFile" type="file" accept="image/*" hidden>
+ <button id="bgImgBtn" title="Background image">🖼️ BG</button>
+ <!-- import -->
+ <input id="impFile" type="file" accept="image/*" hidden>
+ <button id="impBtn" title="Import image">📥 Img</button>
+ <!-- io -->
+ <button id="save">💾 Save</button>
+ <input id="loadFile" type="file" accept="application/json" hidden>
+ <button id="load">📂 Load</button>
+ <button id="export">📹 Export</button>
+</header>
+<main>
+ <div id="frames"></div>
+ <div id="stage">
+   <canvas id="onPrev" class="onion"></canvas>
+   <canvas id="onNext" class="onion"></canvas>
+   <canvas id="view" width="800" height="600"></canvas>
+   <div id="selBox"></div>
+ </div>
+</main>
+<script>
+/* ========= constants ============ */
+const W=800,H=600;
+/* ========= DOM refs ============ */
+const view=document.getElementById('view');const vctx=view.getContext('2d');
+const lcv=document.createElement('canvas');lcv.width=W;lcv.height=H;const lctx=lcv.getContext('2d'); // drawing layer
+const onPrev=document.getElementById('onPrev');const onNext=document.getElementById('onNext');[onPrev,onNext].forEach(c=>{c.width=W;c.height=H});const pctx=onPrev.getContext('2d');const nctx=onNext.getContext('2d');
+const framesBar=document.getElementById('frames');const selBox=document.getElementById('selBox');
+/* ========= state ============ */
+let frames=[{bg:{color:'#ffffff',img:null},layer:lctx.getImageData(0,0,W,H)}];
+let current=0;let tool='pen';let drawing=false;let sx=0,sy=0;let fps=12;let col='#000000';let undo=[];let selection=null;
+/* ========= helpers ============ */
+function setTool(t,btn){tool=t;document.querySelectorAll('header button').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}
+function snapshot(){undo.push(lctx.getImageData(0,0,W,H));if(undo.length>40)undo.shift()}
+function commitLayer(){frames[current].layer=lctx.getImageData(0,0,W,H);updateThumb(current)}
+function composite(){const f=frames[current];vctx.clearRect(0,0,W,H);
+ vctx.fillStyle=f.bg.color;vctx.fillRect(0,0,W,H);
+ if(f.bg.img)vctx.drawImage(f.bg.img,0,0,W,H);
+ vctx.drawImage(lcv,0,0);
+}
+function loadFrame(i){current=i;lctx.clearRect(0,0,W,H);lctx.putImageData(frames[i].layer,0,0);updateOnion();buildThumbs();composite()}
+function newFrame(){const copyBg=JSON.parse(JSON.stringify(frames[current].bg));frames.splice(current+1,0,{bg:copyBg,layer:new ImageData(W,H)});loadFrame(current+1)}
+function deleteFrame(){if(frames.length>1){frames.splice(current,1);loadFrame(Math.max(0,current-1))}}
+function buildThumbs(){framesBar.innerHTML='';frames.forEach((f,i)=>{const c=document.createElement('canvas');c.width=160;c.height=120;const tx=c.getContext('2d');tx.fillStyle=f.bg.color;tx.fillRect(0,0,c.width,c.height);if(f.bg.img)tx.drawImage(f.bg.img,0,0,c.width,c.height);tx.putImageData(f.layer,0,0);c.className='thumb'+(i===current?' active':'');c.onclick=()=>loadFrame(i);c.draggable=true;c.ondragstart=e=>e.dataTransfer.setData('text/plain',i);c.ondragover=e=>e.preventDefault();c.ondrop=e=>{const from=+e.dataTransfer.getData('text/plain');const to=i;const item=frames.splice(from,1)[0];frames.splice(to,0,item);loadFrame(to)};framesBar.appendChild(c)})}
+function updateThumb(i){const c=framesBar.children[i];if(!c)return;const tx=c.getContext('2d');const f=frames[i];tx.fillStyle=f.bg.color;tx.fillRect(0,0,c.width,c.height);if(f.bg.img)tx.drawImage(f.bg.img,0,0,c.width,c.height);tx.putImageData(f.layer,0,0)}
+function updateOnion(){pctx.clearRect(0,0,W,H);nctx.clearRect(0,0,W,H);onPrev.style.display=current>0?'block':'none';onNext.style.display=current<frames.length-1?'block':'none';if(current>0)pctx.putImageData(frames[current-1].layer,0,0);if(current<frames.length-1)nctx.putImageData(frames[current+1].layer,0,0)}
+/* ========= flood fill ============ */
+function bucketFill(x,y){const img=lctx.getImageData(0,0,W,H);const data=img.data;const idx=(y*W+x)*4;const target=[data[idx],data[idx+1],data[idx+2],data[idx+3]];const fill=parseInt(col.slice(1),16);const fr=[(fill>>16)&255,(fill>>8)&255,fill&255,255];if(target.every((v,i)=>v===fr[i]))return;const stack=[[x,y]];while(stack.length){const [cx,cy]=stack.pop();let px=cx;while(px>=0&&match(px,cy)){px--}px++;let spanUp=false,spanDn=false;while(px<W&&match(px,cy)){set(px,cy);if(cy>0){if(match(px,cy-1)){if(!spanUp){stack.push([px,cy-1]);spanUp=true}}else spanUp=false}if(cy<H-1){if(match(px,cy+1)){if(!spanDn){stack.push([px,cy+1]);spanDn=true}}else spanDn=false}px++}}
+ lctx.putImageData(img,0,0);
+ function match(x,y){const id=(y*W+x)*4;return data[id]===target[0]&&data[id+1]===target[1]&&data[id+2]===target[2]&&data[id+3]===target[3]}
+ function set(x,y){const id=(y*W+x)*4;fr.forEach((v,i)=>data[id+i]=v)}
+}
+/* ========= pointer events ============ */
+function pos(e){const r=view.getBoundingClientRect();const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;const cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;return[Math.round(cx*(W/r.width)),Math.round(cy*(H/r.height))]}
+function down(e){e.preventDefault();[sx,sy]=pos(e);drawing=true;if(tool==='pen'||tool==='eraser'){snapshot();lctx.beginPath();lctx.moveTo(sx,sy)}if(tool==='bucket'){snapshot();bucketFill(sx,sy);commitLayer();composite()}if(tool==='select'){selection=null;selBox.style.display='block';selBox.style.left=e.clientX+'px';selBox.style.top=e.clientY+'px';selBox.style.width='0';selBox.style.height='0'} }
+function move(e){if(!drawing)return;e.preventDefault();const[rX,rY]=pos(e);if(tool==='pen'){lctx.lineTo(rX,rY);lctx.strokeStyle=col;lctx.lineWidth=2;lctx.lineCap='round';lctx.stroke();composite()}if(tool==='eraser'){lctx.globalCompositeOperation='destination-out';lctx.lineTo(rX,rY);lctx.lineWidth=20;lctx.stroke();lctx.globalCompositeOperation='source-over';composite()}if(tool==='select'){const w=rX-sx,h=rY-sy;selBox.style.width=Math.abs(w)+'px';selBox.style.height=Math.abs(h)+'px';selBox.style.left=(w<0?rX:sx)+'px';selBox.style.top=(h<0?rY:sy)+'px'} }
+function up(e){if(!drawing)return;drawing=false;if(tool==='pen'||tool==='eraser'){lctx.closePath();commitLayer()}if(tool==='select'){selBox.style.display='none'}composite()}
+view.addEventListener('mousedown',down);view.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+view.addEventListener('touchstart',down,{passive:false});view.addEventListener('touchmove',move,{passive:false});view.addEventListener('touchend',up);
+/* ========= UI binds ============ */
+penBtn.onclick=()=>setTool('pen',penBtn);eraserBtn.onclick=()=>setTool('eraser',eraserBtn);bucketBtn.onclick=()=>setTool('bucket',bucketBtn);selBtn.onclick=()=>setTool('select',selBtn);
+colPick.onchange=e=>col=e.target.value;
+undoBtn.onclick=()=>{if(undo.length){lctx.putImageData(undo.pop(),0,0);commitLayer();composite()}};
+addF.onclick=newFrame;delF.onclick=deleteFrame;fps.onchange=e=>fps=+e.target.value;
+play.onclick=()=>{play.disabled=true;let idx=0;const inter=setInterval(()=>{loadFrame(idx);idx=(idx+1)%frames.length},1000/fps);setTimeout(()=>{clearInterval(inter);play.disabled=false;loadFrame(current)},frames.length*1000/fps*2)};
+bgClr.onchange=e=>{frames[current].bg.color=e.target.value;composite();updateThumb(current)};
+bgImgBtn.onclick=()=>bgImgFile.click();bgImgFile.onchange=e=>{const file=e.target.files[0];if(!file)return;const img=new Image();img.onload=()=>{frames[current].bg.img=img;composite();updateThumb(current)};img.src=URL.createObjectURL(file)};
+impBtn.onclick=()=>impFile.click();impFile.onchange=e=>{const file=e.target.files[0];if(!file)return;const img=new Image();img.onload=()=>{snapshot();lctx.drawImage(img,0,0,W,H);commitLayer();composite()};img.src=URL.createObjectURL(file)};
+/* save / load */
+save.onclick=()=>{const exportFrames=frames.map(f=>({bg:{color:f.bg.color,img:f.bg.img?f.bg.img.src:null},layer:lcv.toDataURL()}));const blob=new Blob([JSON.stringify({fps,frames:exportFrames})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='animation.json';a.click()};
+load.onclick=()=>loadFile.click();loadFile.onchange=e=>{const file=e.target.files[0];if(!file)return;const rd=new FileReader();rd.onload=ev=>{const data=JSON.parse(ev.target.result);fps=data.fps;document.getElementById('fps').value=fps;frames=[];const promises=data.frames.map(fr=>new Promise(res=>{const img=new Image();img.onload=()=>{const tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;tmp.getContext('2d').drawImage(img,0,0);const id=tmp.getContext('2d').getImageData(0,0,W,H);res({bg:fr.bg,layer:id})};img.src=fr.layer}));Promise.all(promises).then(arr=>{frames=arr;loadFrame(0)})};rd.readAsText(file)};
+/* export webm */
+export.onclick=async()=>{const off=document.createElement('canvas');off.width=W;off.height=H;const octx=off.getContext('2d');const stream=off.captureStream(fps);const rec=new MediaRecorder(stream,{mimeType:'video/webm'});const parts=[];rec.ondataavailable=e=>parts.push(e.data);rec.start();for(let f of frames){octx.fillStyle=f.bg.color;octx.fillRect(0,0,W,H);if(f.bg.img)octx.drawImage(f.bg.img,0,0,W,H);octx.putImageData(f.layer,0,0);await new Promise(r=>setTimeout(r,1000/fps))}rec.stop();rec.onstop=()=>{const blob=new Blob(parts,{type:'video/webm'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='animation.webm';a.click()}};
+/* offline cache */
+if('serviceWorker'in navigator){const code=`self.addEventListener('install',e=>{e.waitUntil(caches.open('mini-anim-v2').then(c=>c.addAll(['./'])))});self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))))`;navigator.serviceWorker.register(URL.createObjectURL(new Blob([code],{type:'text/javascript'})))}
+/* init */
+setTool('pen',penBtn);buildThumbs();composite();
+</script>
 </body>
 </html>
+
 
 
 
