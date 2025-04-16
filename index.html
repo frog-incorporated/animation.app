@@ -1,917 +1,350 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animator Pro (Single File Edition)</title>
-    <style>
-        /* --- Reset & Base --- */
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; overflow: hidden; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            background-color: #f8f9fa; /* Lighter overall background */
-            color: #212529;
-            font-size: 14px;
-        }
-        button, input, select { font-family: inherit; font-size: inherit; }
-        :disabled { cursor: not-allowed !important; opacity: 0.6; }
-
-        /* --- Layout --- */
-        #app-container { display: flex; flex-grow: 1; overflow: hidden; height: calc(100vh - 125px); } /* Adjusted height */
-        #toolbar {
-            width: 200px; /* Wider toolbar */
-            flex-shrink: 0;
-            background-color: #e9ecef; /* Slightly darker toolbar bg */
-            border-right: 1px solid #dee2e6;
-            padding: 15px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 18px; /* Increased gap */
-        }
-        #main-area { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; background-color: #adb5bd; /* Area around canvas */ }
-        #canvas-container {
-            flex-grow: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: auto;
-            position: relative;
-            padding: 10px; /* Padding around canvas */
-        }
-        #drawingCanvas {
-            border: 1px solid #495057;
-            cursor: crosshair;
-            background-color: #ffffff;
-            display: block;
-            object-fit: contain;
-            image-rendering: pixelated; /* Keep pixels sharp, especially important for selection */
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            /* Width/Height set by JS */
-        }
-        #onionSkinCanvasUnder, #onionSkinCanvasOver, #selectionCanvas {
-            position: absolute;
-            pointer-events: none;
-            object-fit: contain;
-            image-rendering: pixelated;
-            /* Top/Left/Width/Height set by JS */
-        }
-        #onionSkinCanvasUnder, #onionSkinCanvasOver { opacity: 0.25; }
-        #selectionCanvas { border: 1px dashed #0d6efd; display: none; }
-
-        #timeline-container {
-            height: 125px; /* Slightly taller timeline */
-            background-color: #e9ecef;
-            border-top: 1px solid #dee2e6;
-            display: flex;
-            align-items: center;
-            padding: 10px 15px;
-            overflow-x: auto;
-            overflow-y: hidden;
-        }
-
-        /* --- Toolbar Elements --- */
-        .tool-section { padding-bottom: 10px; border-bottom: 1px solid #ced4da; }
-        .tool-section:last-child { border-bottom: none; }
-        .tool-section h4 {
-            margin-bottom: 10px; font-size: 0.9em; font-weight: 600; color: #495057;
-            text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        #toolbar button, .timeline-control button, .file-control button, .background-control button, .selection-action button {
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-            width: 100%; padding: 9px 10px; margin-bottom: 8px;
-            background-color: #fff; border: 1px solid #adb5bd; border-radius: 5px;
-            cursor: pointer; font-size: 0.95em; text-align: center;
-            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-        #toolbar button:hover, .timeline-control button:hover, .file-control button:hover, .background-control button:hover, .selection-action button:hover {
-            background-color: #f8f9fa; border-color: #6c757d;
-        }
-        #toolbar button.active {
-            background-color: #cfe2ff; border-color: #9ec5fe; font-weight: 600; color: #0a58ca;
-            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
-        }
-        #toolbar button:disabled, .timeline-control button:disabled, .selection-action button:disabled {
-            background-color: #f8f9fa; border-color: #ced4da; color: #6c757d;
-            opacity: 0.7;
-        }
-        #toolbar input[type="color"], #toolbar input[type="range"], #toolbar input[type="number"], .background-control input[type="color"] {
-            width: 100%; margin-bottom: 8px; padding: 6px 8px; border: 1px solid #adb5bd; border-radius: 4px;
-        }
-        #toolbar input[type="color"] { height: 35px; padding: 3px; }
-        #toolbar input[type="file"] { display: none; }
-        #toolbar label, .background-control label, .canvas-setting label {
-            display: block; font-size: 0.85em; margin-bottom: 5px; color: #495057; font-weight: 500;
-        }
-        .inline-label { display: inline-block; margin-right: 5px; vertical-align: middle;}
-        .input-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .input-group label { margin-bottom: 0; }
-        .input-group input[type="number"] { width: 65px; text-align: right; padding: 4px;}
-
-        #brush-size-container { display: flex; align-items: center; gap: 8px; margin-bottom: 8px;}
-        #brush-size { flex-grow: 1; }
-        #brush-size-label { font-size: 0.9em; min-width: 25px; text-align: right; }
-
-        /* --- Timeline Elements --- */
-        #timeline-controls {
-            display: flex; flex-direction: column; justify-content: center;
-            padding-right: 15px; margin-right: 15px; border-right: 1px solid #ced4da; height: 100%;
-        }
-         .timeline-control button { width: 100px; height: 32px; padding: 5px; font-size: 0.9em; margin-bottom: 6px; }
-         .timeline-control button:last-child { margin-bottom: 0; }
-         #frames { display: flex; height: 100%; align-items: center; gap: 10px; padding-bottom: 5px; }
-        .frame {
-            border: 2px solid #adb5bd; width: 110px; height: 90px; /* Larger thumbnails */
-            cursor: pointer; position: relative; background-color: #fff;
-            background-size: contain; background-repeat: no-repeat; background-position: center;
-            flex-shrink: 0; border-radius: 4px; overflow: hidden;
-            display: flex; justify-content: center; align-items: center;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .frame:hover { border-color: #0d6efd; }
-        .frame.active-frame { border-color: #0a58ca; box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.35); }
-         .frame-number {
-             position: absolute; bottom: 4px; right: 6px; background-color: rgba(0, 0, 0, 0.7);
-             color: white; font-size: 0.8em; padding: 2px 5px; border-radius: 3px;
-         }
-         .delete-frame {
-            position: absolute; top: 3px; right: 3px; width: 20px; height: 20px;
-            background-color: rgba(220, 53, 69, 0.8); color: white; border: none;
-            border-radius: 50%; font-size: 13px; line-height: 20px; text-align: center;
-            cursor: pointer; opacity: 0; transition: opacity 0.2s ease; z-index: 1;
-         }
-         .frame:hover .delete-frame { opacity: 1; }
-         .delete-frame:hover { background-color: rgba(200, 33, 49, 1); }
-
-        /* --- Specific Controls --- */
-         #playback-controls, #onion-skin-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-         #playback-controls label, #onion-skin-controls label { font-size: 0.85em; }
-         #playback-controls input[type="number"], #onion-skin-controls input[type="number"] { width: 60px; padding: 4px; }
-         .background-control input[type="color"] { width: 40px; height: 30px; padding: 1px; margin-bottom: 0; vertical-align: middle;}
-         .background-control button { width: auto; padding: 6px 10px; font-size: 0.9em; margin-bottom: 0; vertical-align: middle;}
-         #export-status { font-size: 0.85em; color: #0d6efd; margin-top: 5px; min-height: 1.2em; }
-         .hidden { display: none !important; } /* Utility class */
-
-        /* --- Mobile Adjustments --- */
-        @media (max-width: 768px) {
-             html, body { height: auto; overflow: visible; font-size: 13px; }
-            #app-container { flex-direction: column; height: auto; }
-            #toolbar {
-                width: 100%; order: 2; /* Toolbar comes after timeline */
-                border-right: none; border-top: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6;
-                flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
-                padding: 8px; gap: 12px; align-items: center;
-            }
-            #toolbar .tool-section { flex-shrink: 0; padding-bottom: 0; border-bottom: none; margin-bottom: 0; }
-            #toolbar .tool-section h4 { display: none; }
-            #toolbar button { width: auto; font-size: 0.9em; padding: 8px 10px; min-width: 44px; height: 40px; margin-bottom: 0;} /* Touch target size */
-            #toolbar label { display: none; }
-            #toolbar input[type="color"] { width: 40px; height: 35px; }
-             #brush-size-container { width: 120px; margin-bottom: 0;}
-             .input-group input[type="number"] { width: 55px; }
-
-
-            #main-area { order: 0; height: calc(65vh); } /* Adjust height as needed */
-            #timeline-container { order: 1; height: 110px; padding: 8px; }
-            .frame { width: 90px; height: 70px; }
-            #timeline-controls { padding-right: 10px; margin-right: 10px; }
-             .timeline-control button { width: 85px; height: 30px; font-size: 0.8em; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animation App</title>
+<style>
+  body{margin:0;display:flex;flex-direction:column;height:100vh;font-family:sans-serif}
+  #toolbar{display:flex;overflow-x:auto;background:#f0f0f0;padding:5px;align-items:center}
+  #toolbar > *{margin-right:5px}
+  #main{flex:1;display:flex;overflow:hidden}
+  #canvasWrapper{flex:1;position:relative;background:#ccc}
+  canvas{width:100%;height:100%;touch-action:none;background:#fff;display:block}
+  #framesPanel{width:120px;background:#e0e0e0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:5px}
+  .frame{width:100px;height:75px;margin:5px;border:2px solid #999;cursor:pointer;position:relative}
+  .frame.current{border-color:#007BFF}
+  @media (max-width:600px){
+    #framesPanel{flex-direction:row;width:auto;overflow-x:auto;overflow-y:hidden;height:90px}
+    .frame{margin:2px}
+  }
+  #previewCanvas{position:absolute;top:0;left:0;pointer-events:none;opacity:1}
+  #scaleControls{display:none;align-items:center}
+</style>
 </head>
 <body>
-
-    <div id="app-container">
-        <div id="toolbar">
-            <div class="tool-section">
-                <h4>Canvas</h4>
-                 <div class="input-group canvas-setting">
-                    <label for="canvas-width" class="inline-label">Width:</label>
-                    <input type="number" id="canvas-width" value="800" min="100" step="10"> px
-                 </div>
-                 <div class="input-group canvas-setting">
-                     <label for="canvas-height" class="inline-label">Height:</label>
-                    <input type="number" id="canvas-height" value="600" min="100" step="10"> px
-                 </div>
-                 <button id="apply-canvas-size">Apply Size</button>
-                 <small>Warning: Clears animation!</small>
-            </div>
-
-            <div class="tool-section">
-                <h4>Tools</h4>
-                <button id="pen-tool" class="tool active" title="Pen (P)">✏️ Pen</button>
-                <button id="eraser-tool" class="tool" title="Eraser (E)">🧼 Eraser</button>
-                <button id="paint-bucket-tool" class="tool" title="Paint Bucket (B)">🩸 Bucket</button>
-                <button id="select-tool" class="tool" title="Select Tool (S)">✂️ Select</button>
-                 <div id="selection-actions" class="hidden">
-                    <button id="copy-button" class="selection-action" title="Copy Selection (Ctrl+C)">📝 Copy</button>
-                    <button id="paste-button" class="selection-action" title="Paste Selection (Ctrl+V)" disabled>📋 Paste</button>
-                    </div>
-                 <hr style="margin: 10px 0;">
-                <button id="undo-button" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>
-            </div>
-
-            <div class="tool-section">
-                <h4>Options</h4>
-                <label for="color-picker">Color:</label>
-                <input type="color" id="color-picker" value="#000000" title="Drawing Color">
-                 <label for="brush-size">Size:</label>
-                 <div id="brush-size-container">
-                    <input type="range" id="brush-size" min="1" max="100" value="5" title="Brush Size">
-                    <span id="brush-size-label">5</span>
-                 </div>
-            </div>
-
-             <div class="tool-section">
-                <h4>Playback & Export</h4>
-                 <div id="playback-controls">
-                    <button id="play-pause-button" title="Play/Pause Animation">▶️ Play</button>
-                    <label for="fps-input" class="inline-label">FPS:</label>
-                    <input type="number" id="fps-input" value="12" min="1" max="60">
-                </div>
-                <button id="export-video-button" title="Export Animation as WebM Video">🎬 Export Video</button>
-                <div id="export-status"></div>
-            </div>
-
-            <div class="tool-section">
-                <h4>Background</h4>
-                 <div class="background-control input-group">
-                    <label for="bg-color-picker" class="inline-label">Color:</label>
-                    <input type="color" id="bg-color-picker" value="#FFFFFF" title="Background Color">
-                    <button id="set-bg-color">Set</button>
-                    <input type="file" id="bg-image-upload" accept="image/*">
-                    <button onclick="document.getElementById('bg-image-upload').click();" title="Upload Background Image">🖼️ Upload</button>
-                 </div>
-            </div>
-
-             <div class="tool-section">
-                <h4>Project</h4>
-                <div class="file-control">
-                    <button id="save-button" title="Save Project File (.animproj)">💾 Save</button>
-                     <input type="file" id="load-input" accept=".json, .animproj">
-                     <button onclick="document.getElementById('load-input').click();" title="Load Project File">📂 Load</button>
-                     <input type="file" id="import-image-upload" accept="image/*">
-                     <button onclick="document.getElementById('import-image-upload').click();" title="Import Image to Current Frame">📥 Import</button>
-                 </div>
-            </div>
-
-             <div class="tool-section">
-                 <h4>Onion Skin</h4>
-                 <div id="onion-skin-controls">
-                    <label for="onion-skin-before" class="inline-label">Before:</label>
-                    <input type="number" id="onion-skin-before" value="1" min="0" max="5">
-                    <label for="onion-skin-after" class="inline-label">After:</label>
-                    <input type="number" id="onion-skin-after" value="1" min="0" max="5">
-                </div>
-             </div>
-
-        </div> {/* */}
-
-        <div id="main-area">
-            <div id="canvas-container">
-                <canvas id="onionSkinCanvasUnder"></canvas>
-                <canvas id="drawingCanvas"></canvas> {/* Main drawing canvas */}
-                <canvas id="onionSkinCanvasOver"></canvas>
-                <canvas id="selectionCanvas"></canvas> {/* For selection box visual */}
-            </div>
-        </div> {/* */}
-    </div> {/* */}
-
-    <div id="timeline-container">
-        <div id="timeline-controls">
-            <div class="timeline-control"> <button id="add-frame-button" title="Add New Frame After Current">➕ Add</button> </div>
-            <div class="timeline-control"> <button id="duplicate-frame-button" title="Duplicate Current Frame">📋 Duplicate</button> </div>
-            <div class="timeline-control"> <button id="delete-frame-button" title="Delete Current Frame">🗑️ Delete</button> </div>
-        </div>
-        <div id="frames">
-            {/* Frame thumbnails will be added here by JS */}
-        </div>
-    </div> {/* */}
-
-    <script>
-        // --- Globals & Constants ---
-        const canvas = document.getElementById('drawingCanvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const onionCanvasUnder = document.getElementById('onionSkinCanvasUnder');
-        const ctxOnionUnder = onionCanvasUnder.getContext('2d');
-        const onionCanvasOver = document.getElementById('onionSkinCanvasOver');
-        const ctxOnionOver = onionCanvasOver.getContext('2d');
-        const selectionCanvas = document.getElementById('selectionCanvas');
-        const ctxSelection = selectionCanvas.getContext('2d');
-        const selectionActionsDiv = document.getElementById('selection-actions');
-        const copyButton = document.getElementById('copy-button');
-        const pasteButton = document.getElementById('paste-button');
-
-        const MAX_UNDO_STEPS = 30;
-        const DEFAULT_CANVAS_WIDTH = 800;
-        const DEFAULT_CANVAS_HEIGHT = 600;
-
-        // --- State Variables ---
-        let currentTool = 'pen';
-        let isDrawing = false;
-        let isSelecting = false;
-        let lastX = 0;
-        let lastY = 0;
-        let brushSize = 5;
-        let currentColor = '#000000';
-        let backgroundColor = '#FFFFFF';
-        let backgroundImage = null;
-        let frames = []; // Stores ImageData objects
-        let currentFrameIndex = 0;
-        let undoStack = [];
-        let fps = 12;
-        let isPlaying = false;
-        let animationInterval = null;
-        let onionSkinBefore = 1;
-        let onionSkinAfter = 1;
-        let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
-        let selectionActive = false;
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        let clipboardData = null; // Holds ImageData for copy/paste
-        let currentCanvasWidth = DEFAULT_CANVAS_WIDTH;
-        let currentCanvasHeight = DEFAULT_CANVAS_HEIGHT;
-
-
-        // --- Initialization ---
-        function initialize() {
-            console.log("Initializing Animation App...");
-            // Set initial dimensions from inputs or defaults
-            currentCanvasWidth = parseInt(document.getElementById('canvas-width').value) || DEFAULT_CANVAS_WIDTH;
-            currentCanvasHeight = parseInt(document.getElementById('canvas-height').value) || DEFAULT_CANVAS_HEIGHT;
-            setCanvasDimensions(currentCanvasWidth, currentCanvasHeight, true); // Initial set, no warning
-
-            frames = [createBlankImageData()];
-            currentFrameIndex = 0;
-            loadFrame(currentFrameIndex);
-            updateTimeline();
-            setActiveFrame(currentFrameIndex);
-            setupUI();
-            setupEventListeners();
-            console.log("Initialization Complete.");
-        }
-
-        function setupUI() {
-             document.getElementById('canvas-width').value = currentCanvasWidth;
-             document.getElementById('canvas-height').value = currentCanvasHeight;
-            document.getElementById('pen-tool').classList.add('active');
-            document.getElementById('brush-size').value = brushSize;
-            document.getElementById('brush-size-label').textContent = brushSize;
-            document.getElementById('color-picker').value = currentColor;
-            document.getElementById('fps-input').value = fps;
-            document.getElementById('bg-color-picker').value = backgroundColor;
-            document.getElementById('onion-skin-before').value = onionSkinBefore;
-            document.getElementById('onion-skin-after').value = onionSkinAfter;
-            document.getElementById('undo-button').disabled = true;
-            pasteButton.disabled = !clipboardData; // Disable paste initially
-             selectionActionsDiv.classList.add('hidden'); // Hide copy/paste buttons
-        }
-
-        function createBlankImageData() {
-            return ctx.createImageData(currentCanvasWidth, currentCanvasHeight);
-        }
-
-        // --- Canvas & Context ---
-        function setCanvasDimensions(width, height, isInitialSetup = false) {
-             if (!isInitialSetup && frames.length > 0 && (width !== currentCanvasWidth || height !== currentCanvasHeight)) {
-                 if (!confirm(`Changing canvas size to ${width}x${height} will clear your current animation. Continue?`)) {
-                     // Reset input fields if user cancels
-                     document.getElementById('canvas-width').value = currentCanvasWidth;
-                     document.getElementById('canvas-height').value = currentCanvasHeight;
-                     return; // Stop if user cancels
-                 }
-                 // Clear animation if size changes and confirmed
-                 frames = [];
-                 clipboardData = null; // Clear clipboard too
-                 clearUndoStack();
-                 console.log("Animation cleared due to canvas resize.");
-             }
-
-             currentCanvasWidth = width;
-             currentCanvasHeight = height;
-
-             // Update internal resolution for all canvases
-             [canvas, onionCanvasUnder, onionCanvasOver, selectionCanvas].forEach(c => {
-                 c.width = width;
-                 c.height = height;
-                 // Update display style (CSS handles scaling via object-fit)
-                 c.style.width = `${width}px`;
-                 c.style.height = `${height}px`;
-             });
-
-             // Reset/recreate initial frame if animation was cleared
-             if (frames.length === 0) {
-                 frames = [createBlankImageData()];
-                 currentFrameIndex = 0;
-                 loadFrame(0);
-                 updateTimeline();
-             } else {
-                 // If not cleared (e.g., initial setup), just reload current frame state
-                 loadFrame(currentFrameIndex);
-             }
-
-             drawOnionSkins(); // Redraw onion skins for new size
-             positionOverlayCanvases(); // Reposition overlays
-
-             console.log(`Canvas size set to ${width}x${height}`);
-        }
-
-
-        function positionOverlayCanvases() {
-             // Adjust overlays based on the main canvas's *rendered* position and size
-             requestAnimationFrame(() => { // Ensure layout is calculated
-                 const rect = canvas.getBoundingClientRect();
-                 const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
-                 const topOffset = rect.top - containerRect.top;
-                 const leftOffset = rect.left - containerRect.left;
-
-                 [onionCanvasUnder, onionCanvasOver, selectionCanvas].forEach(overlay => {
-                     overlay.style.top = `${topOffset}px`;
-                     overlay.style.left = `${leftOffset}px`;
-                     overlay.style.width = `${rect.width}px`; // Match rendered size
-                     overlay.style.height = `${rect.height}px`;
-                     overlay.style.transform = 'none';
-                 });
-             });
-        }
-
-
-        function clearCanvas(targetCtx = ctx) {
-            targetCtx.clearRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
-        }
-
-        function drawBackground(targetCtx = ctx, targetWidth = currentCanvasWidth, targetHeight = currentCanvasHeight) {
-            if (backgroundImage) {
-                targetCtx.drawImage(backgroundImage, 0, 0, targetWidth, targetHeight);
-            } else {
-                targetCtx.fillStyle = backgroundColor;
-                targetCtx.fillRect(0, 0, targetWidth, targetHeight);
-            }
-        }
-
-        // --- Drawing Logic ---
-        function getCanvasPos(evt) {
-            const rect = canvas.getBoundingClientRect();
-            // Important: Use canvas.width/height (internal resolution) not rect.width/height
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            let clientX, clientY;
-
-            if (evt.touches && evt.touches.length > 0) {
-                clientX = evt.touches[0].clientX;
-                clientY = evt.touches[0].clientY;
-            } else {
-                clientX = evt.clientX;
-                clientY = evt.clientY;
-            }
-
-            return {
-                x: Math.floor((clientX - rect.left) * scaleX),
-                y: Math.floor((clientY - rect.top) * scaleY)
-            };
-        }
-
-        function startAction(e) {
-            e.preventDefault();
-            const pos = getCanvasPos(e);
-
-            if (currentTool === 'select') {
-                // If clicking outside an existing selection, start a new one
-                if (!selectionActive || !isPointInSelection(pos.x, pos.y)) {
-                     isSelecting = true;
-                     selectionActive = false; // Deactivate old selection visually
-                     selectionRect.x = pos.x;
-                     selectionRect.y = pos.y;
-                     selectionRect.w = 0;
-                     selectionRect.h = 0;
-                     selectionCanvas.style.display = 'block';
-                     selectionActionsDiv.classList.add('hidden'); // Hide actions while drawing new selection
-                     drawSelectionRectangle();
-                } else {
-                     // TODO: Implement move/resize logic here if clicking *inside* active selection
-                     console.log("Clicked inside active selection (move/resize not implemented)");
-                }
-            } else if (currentTool === 'paint-bucket') {
-                clearSelectionRectangle(); // Clear selection if using bucket
-                saveUndoState();
-                paintBucketFill(pos.x, pos.y);
-                saveCurrentFrameData();
-                saveCurrentFrameThumbnail();
-            } else { // Pen or Eraser
-                clearSelectionRectangle(); // Clear selection if drawing
-                saveUndoState();
-                isDrawing = true;
-                [lastX, lastY] = [pos.x, pos.y];
-                draw(e);
-            }
-        }
-
-        function performAction(e) {
-             if (!isDrawing && !isSelecting) return;
-             e.preventDefault();
-             const pos = getCanvasPos(e);
-
-            if (isDrawing) {
-                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                ctx.globalCompositeOperation = (currentTool === 'eraser') ? 'destination-out' : 'source-over';
-                ctx.strokeStyle = (currentTool === 'eraser') ? 'rgba(0,0,0,1)' : currentColor;
-                ctx.lineWidth = brushSize;
-                ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y); ctx.stroke();
-                [lastX, lastY] = [pos.x, pos.y];
-            } else if (isSelecting) {
-                selectionRect.w = pos.x - selectionRect.x;
-                selectionRect.h = pos.y - selectionRect.y;
-                drawSelectionRectangle();
-            }
-        }
-
-        function endAction(e) {
-            if (isDrawing) {
-                isDrawing = false;
-                ctx.globalCompositeOperation = 'source-over';
-                saveCurrentFrameData();
-                saveCurrentFrameThumbnail();
-            }
-            if (isSelecting) {
-                isSelecting = false;
-                const normRect = getNormalizedSelectionRect();
-                if (normRect.w > 2 && normRect.h > 2) {
-                     selectionActive = true;
-                     console.log("Selection Area:", normRect);
-                     selectionActionsDiv.classList.remove('hidden'); // Show copy/paste buttons
-                     copyButton.disabled = false;
-                 } else {
-                     clearSelectionRectangle(); // Clear if selection too small
-                 }
-            }
-        }
-
-        // --- Selection Tool & Copy/Paste ---
-        function drawSelectionRectangle() {
-            clearCanvas(ctxSelection);
-            const rect = getNormalizedSelectionRect();
-            ctxSelection.setLineDash([5, 3]);
-            ctxSelection.strokeStyle = '#0d6efd';
-            ctxSelection.lineWidth = 1;
-            ctxSelection.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w, rect.h);
-        }
-
-        function clearSelectionRectangle() {
-            clearCanvas(ctxSelection);
-            selectionCanvas.style.display = 'none';
-            selectionActive = false;
-             selectionActionsDiv.classList.add('hidden'); // Hide actions
-             copyButton.disabled = true;
-             // Keep paste button enabled if clipboard has data: pasteButton.disabled = !clipboardData;
-        }
-
-        function getNormalizedSelectionRect() {
-            let x = Math.max(0, Math.min(selectionRect.x, selectionRect.x + selectionRect.w));
-             let y = Math.max(0, Math.min(selectionRect.y, selectionRect.y + selectionRect.h));
-             let w = Math.abs(selectionRect.w);
-             let h = Math.abs(selectionRect.h);
-
-             // Clamp to canvas bounds
-             if (x + w > currentCanvasWidth) w = currentCanvasWidth - x;
-             if (y + h > currentCanvasHeight) h = currentCanvasHeight - y;
-
-             return { x, y, w: Math.max(0, w), h: Math.max(0, h) }; // Ensure non-negative w/h
-        }
-
-         function isPointInSelection(x, y) {
-             if (!selectionActive) return false;
-             const rect = getNormalizedSelectionRect();
-             return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
-         }
-
-         function copySelection() {
-             if (!selectionActive) return;
-             const rect = getNormalizedSelectionRect();
-             if (rect.w <= 0 || rect.h <= 0) return;
-
-             console.log(`Copying selection: ${rect.w}x${rect.h} at (${rect.x}, ${rect.y})`);
-
-             try {
-                const selectedAreaData = ctx.getImageData(rect.x, rect.y, rect.w, rect.h);
-                const drawingOnlyData = ctx.createImageData(rect.w, rect.h); // Start with transparent data
-                const data = selectedAreaData.data;
-                const newData = drawingOnlyData.data;
-                const bgRgba = hexToRgba(backgroundColor); // Get background color components
-
-                // --- Isolate Drawing Logic ---
-                // This simple version compares against the SOLID background color.
-                // It won't work well for image backgrounds or drawings matching the background color.
-                let hasContent = false;
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-                    const a = data[i + 3];
-
-                    let isBackgroundPixel = false;
-                    if (!backgroundImage && a > 0) { // Only check against solid background if no image bg
-                        // Check if pixel color matches solid background color (within a small tolerance maybe?)
-                         isBackgroundPixel = (r === bgRgba[0] && g === bgRgba[1] && b === bgRgba[2]);
-                    }
-
-                    // Copy pixel if it has alpha AND it's not considered part of the solid background
-                     // OR if there IS a background image (in which case we copy everything for now)
-                    if (a > 0 && (backgroundImage || !isBackgroundPixel)) {
-                        newData[i] = r;
-                        newData[i + 1] = g;
-                        newData[i + 2] = b;
-                        newData[i + 3] = a;
-                        hasContent = true; // Mark that we copied something
-                    } else {
-                        // Leave pixel transparent in newData (already initialized to transparent)
-                    }
-                }
-                // --- End Isolate Logic ---
-
-
-                if(hasContent) {
-                    clipboardData = drawingOnlyData;
-                    pasteButton.disabled = false; // Enable paste button
-                    console.log("Selection copied to clipboard.");
-                    // Optional: Visual feedback like flashing the selection border
-                } else {
-                    console.log("Selection appeared empty (or matched background), nothing copied.");
-                    clipboardData = null;
-                    pasteButton.disabled = true;
-                }
-
-             } catch (error) {
-                  console.error("Error copying selection:", error);
-                  alert("Could not copy selection. It might be outside the canvas bounds or too large.");
-                  clipboardData = null;
-                  pasteButton.disabled = true;
-             }
-         }
-
-         function pasteSelection() {
-             if (!clipboardData) return;
-
-             // Paste at top-left corner (0,0) for simplicity
-             const pasteX = 0;
-             const pasteY = 0;
-
-             console.log(`Pasting clipboard data (${clipboardData.width}x${clipboardData.height}) at (${pasteX}, ${pasteY})`);
-
-             saveUndoState(); // Save state before pasting
-             ctx.putImageData(clipboardData, pasteX, pasteY);
-             saveCurrentFrameData(); // Save modified frame
-             saveCurrentFrameThumbnail(); // Update thumbnail
-
-             // Optional: Clear selection after paste? Or allow multiple pastes?
-             // clearSelectionRectangle();
-         }
-
-
-        // --- Paint Bucket ---
-        // [Helper functions: hexToRgba, getPixelColor, setPixelColor, colorsMatch - unchanged from previous version]
-        function hexToRgba(hex) { if (!hex) return [0, 0, 0, 0]; hex = hex.replace('#', ''); const r = parseInt(hex.slice(0, 2), 16); const g = parseInt(hex.slice(2, 4), 16); const b = parseInt(hex.slice(4, 6), 16); return [r, g, b, 255]; }
-        function getPixelColor(imageData, x, y) { if (x < 0 || x >= imageData.width || y < 0 || y >= imageData.height) { return [-1, -1, -1, -1]; } const offset = (y * imageData.width + x) * 4; return [imageData.data[offset], imageData.data[offset + 1], imageData.data[offset + 2], imageData.data[offset + 3]]; }
-        function setPixelColor(imageData, x, y, color) { const offset = (y * imageData.width + x) * 4; imageData.data[offset] = color[0]; imageData.data[offset + 1] = color[1]; imageData.data[offset + 2] = color[2]; imageData.data[offset + 3] = color[3]; }
-        function colorsMatch(color1, color2) { return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3]; }
-
-        function paintBucketFill(startX, startY) { /* ... Paint bucket logic unchanged ... */
-            console.time("FloodFill");
-            const imgData = ctx.getImageData(0, 0, currentCanvasWidth, currentCanvasHeight);
-            const width = imgData.width; const height = imgData.height;
-            const targetColor = getPixelColor(imgData, startX, startY);
-            const fillColor = hexToRgba(currentColor);
-            if (targetColor[0] === -1) { console.warn("Fill start out of bounds"); return; }
-            if (colorsMatch(targetColor, fillColor)) { return; }
-
-            const stack = [[startX, startY]];
-            const visited = new Uint8Array(width * height); // Use Uint8Array for memory efficiency
-            const targetR = targetColor[0], targetG = targetColor[1], targetB = targetColor[2], targetA = targetColor[3]; // Cache target color components
-
-            while (stack.length > 0) {
-                const [x, y] = stack.pop();
-                let currentY = y;
-                while (currentY >= 0) { // Go up first
-                    const pixelIndex = currentY * width + x;
-                     const offset = pixelIndex * 4;
-                    if(visited[pixelIndex] === 1 || imgData.data[offset] !== targetR || imgData.data[offset+1] !== targetG || imgData.data[offset+2] !== targetB || imgData.data[offset+3] !== targetA) break;
-                    currentY--;
-                }
-                 currentY++; // Move back into the valid fill row
-
-                let spanLeft = false; let spanRight = false;
-                 while (currentY < height) { // Scan down
-                     const pixelIndex = currentY * width + x;
-                     const offset = pixelIndex * 4;
-                      if(visited[pixelIndex] === 1 || imgData.data[offset] !== targetR || imgData.data[offset+1] !== targetG || imgData.data[offset+2] !== targetB || imgData.data[offset+3] !== targetA) break; // Stop if color doesn't match or visited
-
-                     setPixelColor(imgData, x, currentY, fillColor);
-                     visited[pixelIndex] = 1;
-
-                     // Check Left
-                     if (x > 0) {
-                         const leftPixelIndex = currentY * width + (x - 1);
-                         const leftOffset = leftPixelIndex * 4;
-                         if (visited[leftPixelIndex] === 0 && imgData.data[leftOffset] === targetR && imgData.data[leftOffset+1] === targetG && imgData.data[leftOffset+2] === targetB && imgData.data[leftOffset+3] === targetA) {
-                             if (!spanLeft) { stack.push([x - 1, currentY]); spanLeft = true; }
-                         } else if (spanLeft) { spanLeft = false; }
-                     }
-                     // Check Right
-                     if (x < width - 1) {
-                         const rightPixelIndex = currentY * width + (x + 1);
-                         const rightOffset = rightPixelIndex * 4;
-                         if (visited[rightPixelIndex] === 0 && imgData.data[rightOffset] === targetR && imgData.data[rightOffset+1] === targetG && imgData.data[rightOffset+2] === targetB && imgData.data[rightOffset+3] === targetA) {
-                             if (!spanRight) { stack.push([x + 1, currentY]); spanRight = true; }
-                         } else if (spanRight) { spanRight = false; }
-                     }
-                     currentY++;
-                 }
-            }
-            ctx.putImageData(imgData, 0, 0);
-            console.timeEnd("FloodFill");
-        }
-
-
-        // --- Undo Logic ---
-        // [saveUndoState, undo, clearUndoStack functions unchanged]
-        function saveUndoState() { if (undoStack.length >= MAX_UNDO_STEPS) { undoStack.shift(); } undoStack.push(ctx.getImageData(0, 0, currentCanvasWidth, currentCanvasHeight)); document.getElementById('undo-button').disabled = false; }
-        function undo() { if (undoStack.length > 0) { const prevState = undoStack.pop(); clearCanvas(); drawBackground(); ctx.putImageData(prevState, 0, 0); saveCurrentFrameData(); saveCurrentFrameThumbnail(); } document.getElementById('undo-button').disabled = undoStack.length === 0; }
-        function clearUndoStack() { undoStack = []; document.getElementById('undo-button').disabled = true; }
-
-
-        // --- Frame Management ---
-        // [addFrame, duplicateFrame, deleteFrame, selectFrame, saveCurrentFrameData functions updated slightly for dimensions]
-        function addFrame() { saveCurrentFrameData(); frames.splice(currentFrameIndex + 1, 0, createBlankImageData()); currentFrameIndex++; loadFrame(currentFrameIndex); updateTimeline(); setActiveFrame(currentFrameIndex); clearUndoStack(); clearSelectionRectangle();}
-        function duplicateFrame() { saveCurrentFrameData(); if (currentFrameIndex < 0 || currentFrameIndex >= frames.length) return; const currentImageData = frames[currentFrameIndex]; const duplicateImageData = ctx.createImageData(currentImageData.width, currentImageData.height); duplicateImageData.data.set(currentImageData.data); frames.splice(currentFrameIndex + 1, 0, duplicateImageData); currentFrameIndex++; loadFrame(currentFrameIndex); updateTimeline(); setActiveFrame(currentFrameIndex); clearUndoStack(); clearSelectionRectangle();}
-        function deleteFrame(indexToDelete) { if (frames.length <= 1) { alert("Cannot delete the last frame!"); return; } if (!confirm(`Delete frame ${indexToDelete + 1}? This cannot be undone.`)) return; frames.splice(indexToDelete, 1); currentFrameIndex = Math.min(Math.max(0, currentFrameIndex), frames.length - 1); if (currentFrameIndex >= indexToDelete && indexToDelete > 0) { currentFrameIndex = indexToDelete - 1; } else { currentFrameIndex = 0; } loadFrame(currentFrameIndex); updateTimeline(); setActiveFrame(currentFrameIndex); clearUndoStack(); clearSelectionRectangle();}
-        function selectFrame(index) { if (index === currentFrameIndex || index < 0 || index >= frames.length) return; saveCurrentFrameData(); currentFrameIndex = index; loadFrame(currentFrameIndex); setActiveFrame(index); clearUndoStack(); clearSelectionRectangle();}
-        function saveCurrentFrameData() { if (currentFrameIndex >= 0 && currentFrameIndex < frames.length) { frames[currentFrameIndex] = ctx.getImageData(0, 0, currentCanvasWidth, currentCanvasHeight); } }
-
-        function loadFrame(index) {
-            if (index < 0 || index >= frames.length) return;
-            clearCanvas();
-            drawBackground(); // Draw background first! Essential for export.
-            const frameData = frames[index];
-            if (frameData instanceof ImageData) {
-                ctx.putImageData(frameData, 0, 0);
-            }
-            currentFrameIndex = index;
-            drawOnionSkins();
-            clearSelectionRectangle();
-             // console.log(`Frame ${index+1} loaded. Background drawn: ${backgroundImage ? 'Image' : backgroundColor}`); // Verification for export
-        }
-
-
-        // --- Timeline UI ---
-        // [updateTimeline, generateThumbnail, saveCurrentFrameThumbnail, setActiveFrame functions mostly unchanged]
-        function updateTimeline() { const framesContainer = document.getElementById('frames'); framesContainer.innerHTML = ''; frames.forEach((frameData, index) => { const frameDiv = document.createElement('div'); frameDiv.className = 'frame'; frameDiv.dataset.index = index; const frameNumber = document.createElement('span'); frameNumber.className = 'frame-number'; frameNumber.textContent = index + 1; const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-frame'; deleteBtn.innerHTML = '&times;'; deleteBtn.title = `Delete Frame ${index + 1}`; deleteBtn.onclick = (e) => { e.stopPropagation(); deleteFrame(index); }; frameDiv.appendChild(frameNumber); frameDiv.appendChild(deleteBtn); frameDiv.addEventListener('click', () => selectFrame(index)); generateThumbnail(frameData, frameDiv); framesContainer.appendChild(frameDiv); }); document.getElementById('delete-frame-button').disabled = frames.length <= 1; setActiveFrame(currentFrameIndex); }
-        function generateThumbnail(frameData, frameDiv) { const thumbCanvas = document.createElement('canvas'); const thumbCtx = thumbCanvas.getContext('2d'); const thumbH = 80; const thumbW = thumbH * (currentCanvasWidth / currentCanvasHeight); thumbCanvas.width = thumbW; thumbCanvas.height = thumbH; drawBackground(thumbCtx, thumbW, thumbH); if (frameData instanceof ImageData) { const tempFrameCanvas = document.createElement('canvas'); tempFrameCanvas.width = frameData.width; tempFrameCanvas.height = frameData.height; tempFrameCanvas.getContext('2d').putImageData(frameData, 0, 0); thumbCtx.drawImage(tempFrameCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height); } frameDiv.style.backgroundImage = `url(${thumbCanvas.toDataURL()})`; frameDiv.style.backgroundSize = 'contain'; frameDiv.style.backgroundRepeat = 'no-repeat'; frameDiv.style.backgroundPosition = 'center'; }
-        function saveCurrentFrameThumbnail() { const frameDiv = document.querySelector(`.frame[data-index="${currentFrameIndex}"]`); if (frameDiv && currentFrameIndex >= 0 && currentFrameIndex < frames.length) { generateThumbnail(frames[currentFrameIndex], frameDiv); } }
-        function setActiveFrame(index) { document.querySelectorAll('.frame').forEach(f => f.classList.remove('active-frame')); const activeFrameDiv = document.querySelector(`.frame[data-index="${index}"]`); if (activeFrameDiv) { activeFrameDiv.classList.add('active-frame'); activeFrameDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } }
-
-
-        // --- Onion Skinning ---
-        // [drawOnionSkins, drawOnionSkinLayer functions unchanged]
-         function drawOnionSkins() { clearCanvas(ctxOnionUnder); clearCanvas(ctxOnionOver); drawOnionSkinLayer(ctxOnionUnder, currentFrameIndex - 1, onionSkinBefore, -1, 'blue'); drawOnionSkinLayer(ctxOnionOver, currentFrameIndex + 1, onionSkinAfter, 1, 'red'); }
-         function drawOnionSkinLayer(onionCtx, startIndex, count, direction, tint) { const tempOnionCanvas = document.createElement('canvas'); tempOnionCanvas.width = currentCanvasWidth; tempOnionCanvas.height = currentCanvasHeight; const tempOnionCtx = tempOnionCanvas.getContext('2d'); onionCtx.globalAlpha = 0.5; for (let i = 0; i < count; i++) { const frameIndex = startIndex + (i * direction); if (frameIndex >= 0 && frameIndex < frames.length) { const frameData = frames[frameIndex]; if (frameData instanceof ImageData) { tempOnionCtx.putImageData(frameData, 0, 0); tempOnionCtx.globalCompositeOperation = 'source-atop'; tempOnionCtx.fillStyle = tint; tempOnionCtx.fillRect(0, 0, tempOnionCanvas.width, tempOnionCanvas.height); tempOnionCtx.globalCompositeOperation = 'source-over'; onionCtx.drawImage(tempOnionCanvas, 0, 0); clearCanvas(tempOnionCtx); } } else { break; } } onionCtx.globalAlpha = 1.0; }
-
-
-        // --- Animation Playback & Controls Enable/Disable ---
-        // [playPauseAnimation, disableControls, enableControls, updateFps functions unchanged]
-        function playPauseAnimation() { if (isPlaying) { clearInterval(animationInterval); isPlaying = false; document.getElementById('play-pause-button').innerHTML = '▶️ Play'; document.getElementById('play-pause-button').title = 'Play Animation'; enableControls(); } else { isPlaying = true; saveCurrentFrameData(); document.getElementById('play-pause-button').innerHTML = '❚❚ Pause'; document.getElementById('play-pause-button').title = 'Pause Animation'; disableControls(); let playbackFrameIndex = 0; loadFrame(playbackFrameIndex); setActiveFrame(playbackFrameIndex); animationInterval = setInterval(() => { playbackFrameIndex = (playbackFrameIndex + 1) % frames.length; loadFrame(playbackFrameIndex); setActiveFrame(playbackFrameIndex); }, 1000 / fps); } }
-        function disableControls() { document.querySelectorAll('#toolbar button:not(#play-pause-button), #timeline-controls button, .file-control button, .background-control button, #apply-canvas-size').forEach(btn => btn.disabled = true); document.querySelectorAll('#toolbar input, .background-control input, #canvas-width, #canvas-height').forEach(input => input.disabled = true); document.getElementById('play-pause-button').disabled = false; document.getElementById('export-video-button').disabled = true; }
-        function enableControls() { document.querySelectorAll('#toolbar button, #timeline-controls button, .file-control button, .background-control button, #apply-canvas-size').forEach(btn => btn.disabled = false); document.querySelectorAll('#toolbar input, .background-control input, #canvas-width, #canvas-height').forEach(input => input.disabled = false); document.getElementById('undo-button').disabled = undoStack.length === 0; document.getElementById('delete-frame-button').disabled = frames.length <= 1; document.getElementById('export-video-button').disabled = false; pasteButton.disabled = !clipboardData; copyButton.disabled = !selectionActive; }
-        function updateFps(newFps) { fps = Math.max(1, parseInt(newFps) || 1); document.getElementById('fps-input').value = fps; if (isPlaying) { playPauseAnimation(); playPauseAnimation(); } }
-
-        // --- Background Handling ---
-        // [setBackgroundColor, setBackgroundImage functions unchanged]
-        function setBackgroundColor(color) { backgroundColor = color; backgroundImage = null; document.getElementById('bg-color-picker').value = color; loadFrame(currentFrameIndex); updateTimeline(); }
-        function setBackgroundImage(file) { const reader = new FileReader(); reader.onload = function(e) { const img = new Image(); img.onload = () => { backgroundImage = img; backgroundColor = '#FFFFFF'; loadFrame(currentFrameIndex); updateTimeline(); }; img.onerror = () => alert("Failed to load background image."); img.src = e.target.result; } reader.onerror = () => alert("Failed to read image file."); reader.readAsDataURL(file); }
-
-        // --- Image Import ---
-        // [importImage function unchanged]
-        function importImage(file) { if (currentFrameIndex < 0 || currentFrameIndex >= frames.length) return; const reader = new FileReader(); reader.onload = function(event) { const img = new Image(); img.onload = () => { saveUndoState(); const scale = Math.min(currentCanvasWidth / img.width, currentCanvasHeight / img.height, 1); const drawWidth = img.width * scale; const drawHeight = img.height * scale; const drawX = (currentCanvasWidth - drawWidth) / 2; const drawY = (currentCanvasHeight - drawHeight) / 2; ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight); saveCurrentFrameData(); saveCurrentFrameThumbnail(); }; img.onerror = () => alert("Failed to load image for import."); img.src = event.target.result; } reader.onerror = () => alert("Failed to read image file for import."); reader.readAsDataURL(file); }
-
-        // --- Save/Load Project ---
-        // [saveProject, loadProject, loadImageFromDataURL, loadImageDataFromDataURL updated for dimensions]
-        function saveProject() { saveCurrentFrameData(); const serializableFrames = frames.map(imageData => { const tempCanvas = document.createElement('canvas'); tempCanvas.width = imageData.width; tempCanvas.height = imageData.height; tempCanvas.getContext('2d').putImageData(imageData, 0, 0); return tempCanvas.toDataURL(); }); const projectData = { version: 3, canvasWidth: currentCanvasWidth, canvasHeight: currentCanvasHeight, backgroundColor: backgroundColor, backgroundImage: backgroundImage ? backgroundImage.src : null, fps: fps, frames: serializableFrames }; const jsonString = JSON.stringify(projectData); const blob = new Blob([jsonString], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `animation_${Date.now()}.animproj`; a.click(); URL.revokeObjectURL(url); console.log("Project saved."); }
-        function loadProject(file) { if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const projectData = JSON.parse(e.target.result); if (!projectData || (projectData.version !== 2 && projectData.version !== 3)) { throw new Error("Incompatible project file version."); } if (!Array.isArray(projectData.frames) || projectData.frames.length === 0) { throw new Error("Project contains no frames."); } if (isPlaying) playPauseAnimation(); const loadedWidth = projectData.canvasWidth || DEFAULT_CANVAS_WIDTH; const loadedHeight = projectData.canvasHeight || DEFAULT_CANVAS_HEIGHT; setCanvasDimensions(loadedWidth, loadedHeight, true); // Force set size, assume user wants loaded size (clears if different) fps = projectData.fps || 12; backgroundColor = projectData.backgroundColor || '#FFFFFF'; backgroundImage = null; const bgImagePromise = projectData.backgroundImage ? loadImageFromDataURL(projectData.backgroundImage) : Promise.resolve(null); bgImagePromise.then(img => { backgroundImage = img; return Promise.all(projectData.frames.map(dataUrl => loadImageDataFromDataURL(dataUrl))); }).then(loadedFrames => { frames = loadedFrames.filter(f => f instanceof ImageData && f.width === currentCanvasWidth && f.height === currentCanvasHeight); if (frames.length === 0) throw new Error("Could not load valid frames matching canvas dimensions."); currentFrameIndex = 0; clearUndoStack(); clipboardData = null; loadFrame(currentFrameIndex); updateTimeline(); setupUI(); console.log("Project loaded successfully."); }).catch(error => { console.error("Error loading project:", error); alert(`Failed to load project: ${error.message}`); initialize(); }); } catch (error) { console.error("Error parsing project file:", error); alert("Failed to load project file. Invalid format?\nError: " + error.message); } }; reader.onerror = () => alert("Failed to read the project file."); reader.readAsText(file); }
-        function loadImageFromDataURL(dataURL) { return new Promise((resolve) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => resolve(null); img.src = dataURL; }); }
-        function loadImageDataFromDataURL(dataURL) { return new Promise((resolve) => { const img = new Image(); img.onload = () => { const tempCanvas = document.createElement('canvas'); tempCanvas.width = img.naturalWidth; tempCanvas.height = img.naturalHeight; const tempCtx = tempCanvas.getContext('2d'); tempCtx.drawImage(img, 0, 0); resolve(tempCtx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)); }; img.onerror = () => resolve(null); img.src = dataURL; }); }
-
-
-        // --- Video Export (MediaRecorder) ---
-        // [exportVideo function unchanged - already includes background]
-        function exportVideo() { if (isPlaying) { alert("Pause animation before exporting."); return; } if (frames.length === 0) { alert("No frames to export."); return; } if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) { alert("Video recording not supported by your browser."); return; } const exportButton = document.getElementById('export-video-button'); const statusDiv = document.getElementById('export-status'); exportButton.disabled = true; exportButton.textContent = '🎬 Recording...'; statusDiv.textContent = 'Starting export...'; disableControls(); recordedChunks = []; const stream = canvas.captureStream(fps); const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']; const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)); if (!supportedMimeType) { alert("No supported video format found (WebM preferred)."); enableControls(); exportButton.disabled = false; exportButton.textContent = '🎬 Export Video'; statusDiv.textContent = ''; return; } console.log("Using MIME type:", supportedMimeType); mediaRecorder = new MediaRecorder(stream, { mimeType: supportedMimeType }); mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); }; mediaRecorder.onstop = () => { const blob = new Blob(recordedChunks, { type: supportedMimeType }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); const fileExtension = supportedMimeType.includes('mp4') ? 'mp4' : 'webm'; a.href = url; a.download = `animation_${Date.now()}.${fileExtension}`; a.click(); URL.revokeObjectURL(url); stream.getTracks().forEach(track => track.stop()); mediaRecorder = null; recordedChunks = []; enableControls(); exportButton.disabled = false; exportButton.textContent = '🎬 Export Video'; statusDiv.textContent = 'Export complete!'; setTimeout(() => statusDiv.textContent = '', 3000); loadFrame(currentFrameIndex); setActiveFrame(currentFrameIndex); console.log("Recording stopped."); }; mediaRecorder.onerror = (event) => { console.error("MediaRecorder Error:", event.error); alert(`Video recording failed: ${event.error.name}`); if (stream) stream.getTracks().forEach(track => track.stop()); mediaRecorder = null; recordedChunks = []; enableControls(); exportButton.disabled = false; exportButton.textContent = '🎬 Export Video'; statusDiv.textContent = 'Export failed.'; }; mediaRecorder.start(); console.log("Recording started."); let frameToRecord = 0; const recordInterval = setInterval(() => { if (frameToRecord < frames.length) { statusDiv.textContent = `Recording frame ${frameToRecord + 1} / ${frames.length}...`; loadFrame(frameToRecord); frameToRecord++; } else { clearInterval(recordInterval); if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); } }, 1000 / fps); }
-
-
-        // --- Event Listeners Setup ---
-        function setupEventListeners() {
-            // Canvas Mouse/Touch
-             canvas.addEventListener('mousedown', startAction); canvas.addEventListener('mousemove', performAction); canvas.addEventListener('mouseup', endAction); canvas.addEventListener('mouseleave', endAction);
-             canvas.addEventListener('touchstart', startAction, { passive: false }); canvas.addEventListener('touchmove', performAction, { passive: false }); canvas.addEventListener('touchend', endAction); canvas.addEventListener('touchcancel', endAction);
-
-            // Toolbar: Tool Selection
-            document.querySelectorAll('.tool').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    document.querySelector('.tool.active').classList.remove('active');
-                    const targetButton = e.currentTarget; targetButton.classList.add('active');
-                    currentTool = targetButton.id.replace('-tool', '');
-                    canvas.style.cursor = (currentTool === 'pen' || currentTool === 'eraser') ? 'crosshair' : (currentTool === 'paint-bucket' ? 'copy' : 'default');
-                    if (currentTool !== 'select') clearSelectionRectangle();
-                    else if (selectionActive) selectionActionsDiv.classList.remove('hidden'); // Show actions if selection exists
-                });
-            });
-
-             // Toolbar: Options
-             document.getElementById('color-picker').addEventListener('input', (e) => currentColor = e.target.value);
-             document.getElementById('brush-size').addEventListener('input', (e) => { brushSize = e.target.value; document.getElementById('brush-size-label').textContent = brushSize; });
-
-             // Toolbar: Undo
-             document.getElementById('undo-button').addEventListener('click', undo);
-
-             // Toolbar: Selection Actions
-             copyButton.addEventListener('click', copySelection);
-             pasteButton.addEventListener('click', pasteSelection);
-
-             // Toolbar: Playback & Export
-             document.getElementById('play-pause-button').addEventListener('click', playPauseAnimation);
-             document.getElementById('fps-input').addEventListener('change', (e) => updateFps(e.target.value));
-             document.getElementById('export-video-button').addEventListener('click', exportVideo);
-
-             // Toolbar: Background
-             document.getElementById('set-bg-color').addEventListener('click', () => setBackgroundColor(document.getElementById('bg-color-picker').value));
-             document.getElementById('bg-image-upload').addEventListener('change', (e) => { if (e.target.files?.[0]) setBackgroundImage(e.target.files[0]); e.target.value = null; });
-
-             // Toolbar: File Operations
-             document.getElementById('save-button').addEventListener('click', saveProject);
-             document.getElementById('load-input').addEventListener('change', (e) => { if (e.target.files?.[0]) loadProject(e.target.files[0]); e.target.value = null; });
-             document.getElementById('import-image-upload').addEventListener('change', (e) => { if (e.target.files?.[0]) importImage(e.target.files[0]); e.target.value = null; });
-
-             // Toolbar: Onion Skin
-             document.getElementById('onion-skin-before').addEventListener('change', (e) => { onionSkinBefore = Math.max(0, parseInt(e.target.value) || 0); drawOnionSkins(); });
-             document.getElementById('onion-skin-after').addEventListener('change', (e) => { onionSkinAfter = Math.max(0, parseInt(e.target.value) || 0); drawOnionSkins(); });
-
-             // Toolbar: Canvas Size Apply
-             document.getElementById('apply-canvas-size').addEventListener('click', () => {
-                 const newWidth = parseInt(document.getElementById('canvas-width').value);
-                 const newHeight = parseInt(document.getElementById('canvas-height').value);
-                 if (newWidth && newHeight && newWidth >= 100 && newHeight >= 100) {
-                     setCanvasDimensions(newWidth, newHeight);
-                 } else {
-                     alert("Please enter valid dimensions (minimum 100x100).");
-                      document.getElementById('canvas-width').value = currentCanvasWidth; // Reset to current valid
-                      document.getElementById('canvas-height').value = currentCanvasHeight;
-                 }
-             });
-
-
-             // Timeline Controls
-             document.getElementById('add-frame-button').addEventListener('click', addFrame);
-             document.getElementById('duplicate-frame-button').addEventListener('click', duplicateFrame);
-             document.getElementById('delete-frame-button').addEventListener('click', () => deleteFrame(currentFrameIndex));
-
-             // Window Resize (adjust overlay positions mainly)
-             window.addEventListener('resize', positionOverlayCanvases);
-
-             // Keyboard Shortcuts
-             window.addEventListener('keydown', (e) => { /* ...unchanged shortcut logic... */
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-                let handled = true; let toolChanged = false;
-                 if (e.ctrlKey || e.metaKey) { // Modifier key shortcuts
-                     switch (e.key.toLowerCase()) {
-                         case 'z': undo(); break;
-                         case 'c': if(selectionActive) copySelection(); break;
-                         case 'v': if(clipboardData) pasteSelection(); break;
-                         default: handled = false;
-                     }
-                 } else { // Tool shortcuts (no modifier)
-                     switch (e.key.toLowerCase()) {
-                         case 'p': currentTool = 'pen'; toolChanged = true; break;
-                         case 'e': currentTool = 'eraser'; toolChanged = true; break;
-                         case 'b': currentTool = 'paint-bucket'; toolChanged = true; break;
-                         case 's': currentTool = 'select'; toolChanged = true; break;
-                         default: handled = false;
-                     }
-                 }
-                 if (handled) e.preventDefault();
-                 if (toolChanged) {
-                     document.querySelectorAll('.tool').forEach(btn => btn.classList.remove('active'));
-                     const toolButton = document.getElementById(`${currentTool}-tool`);
-                     if (toolButton) toolButton.classList.add('active');
-                     canvas.style.cursor = (currentTool === 'pen' || currentTool === 'eraser') ? 'crosshair' : (currentTool === 'paint-bucket' ? 'copy' : 'default');
-                     if (currentTool !== 'select') clearSelectionRectangle();
-                     else if (selectionActive) selectionActionsDiv.classList.remove('hidden');
-                 }
-             });
-        }
-
-        // --- Start ---
-        window.onload = initialize;
-
-    </script>
-
+<div id="toolbar">
+  <button id="penBtn">Pen</button>
+  <button id="eraserBtn">Eraser</button>
+  <button id="bucketBtn">Bucket</button>
+  <button id="selectBtn">Select</button>
+  <button id="undoBtn">Undo</button>
+  <button id="importBtn">Import Image</button>
+  <button id="bgImgBtn">Background Image</button>
+  <input type="color" id="bgColorPicker" title="Background Color">
+  <button id="addFrameBtn">+ Frame</button>
+  <button id="delFrameBtn">- Frame</button>
+  <label>FPS:<input type="number" id="fpsInput" value="12" min="1" style="width:50px"></label>
+  <label>Onion Skin:<input type="checkbox" id="onionCheckbox"></label>
+  <button id="previewBtn">Preview</button>
+  <button id="downloadBtn">Download</button>
+  <button id="saveBtn">Save</button>
+  <button id="loadBtn">Load</button>
+  <div id="scaleControls">
+    <label>Scale:<input type="range" id="scaleSlider" min="10" max="200" value="100"></label>
+    <button id="placeBtn">Place</button>
+    <button id="cancelBtn">Cancel</button>
+  </div>
+</div>
+<div id="main">
+  <div id="canvasWrapper">
+    <canvas id="canvas"></canvas>
+    <canvas id="previewCanvas"></canvas>
+  </div>
+  <div id="framesPanel"></div>
+</div>
+<input type="file" id="importInput" accept="image/*" style="display:none">
+<input type="file" id="bgImgInput" accept="image/*" style="display:none">
+<script>
+(async()=>{const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const previewCanvas=document.getElementById('previewCanvas'),pctx=previewCanvas.getContext('2d');
+let cw=800,ch=600;function resize(){cw=canvas.width=canvas.clientWidth;ch=canvas.height=canvas.clientHeight;previewCanvas.width=cw;previewCanvas.height=ch;}window.addEventListener('resize',resize);resize();
+
+let tool='pen',color='#000000',size=4,fps=12,onion=false;
+let frames=[],histories=[],current=0;
+const offscreen=document.createElement('canvas'),offctx=offscreen.getContext('2d');
+let selection=null;
+
+function createEmptyFrame(){
+  let imgData=ctx.createImageData(cw,ch);
+  for(let i=0;i<imgData.data.length;i+=4)imgData.data[i+3]=0;
+  return {imageData:imgData,backgroundColor:'#ffffff',backgroundImage:null};
+}
+function init(){frames=[createEmptyFrame()];histories=[[]];current=0;drawFrame();updateHistory();updateUI();}
+function drawFrame(){
+  const f=frames[current];
+  ctx.clearRect(0,0,cw,ch);
+  if(f.backgroundImage)ctx.drawImage(f.backgroundImage,0,0,cw,ch);
+  else{ctx.fillStyle=f.backgroundColor;ctx.fillRect(0,0,cw,ch);}
+  ctx.putImageData(f.imageData,0,0);
+  if(onion){
+    ctx.globalAlpha=0.3;
+    if(current>0)ctx.putImageData(frames[current-1].imageData,0,0);
+    if(current<frames.length-1)ctx.putImageData(frames[current+1].imageData,0,0);
+    ctx.globalAlpha=1;
+  }
+}
+function updateHistory(){
+  const snap=ctx.getImageData(0,0,cw,ch);
+  histories[current].push(snap);
+  if(histories[current].length>50)histories[current].shift();
+  frames[current].imageData=snap;
+}
+function switchFrame(idx){
+  frames[current].imageData=ctx.getImageData(0,0,cw,ch);
+  current=idx;histories[current]=histories[current]||[];drawFrame();updateUI();
+}
+function updateUI(){
+  drawThumbnails();
+}
+
+function drawThumbnails(){
+  const panel=document.getElementById('framesPanel');panel.innerHTML='';
+  frames.forEach((f,i)=>{
+    const div=document.createElement('div');div.className='frame'+(i===current?' current':'');div.draggable=true;div.dataset.idx=i;
+    const tn=document.createElement('canvas');tn.width=100;tn.height=75;
+    const tctx=tn.getContext('2d');
+    if(f.backgroundImage)tctx.drawImage(f.backgroundImage,0,0,100,75);
+    else{tctx.fillStyle=f.backgroundColor;tctx.fillRect(0,0,100,75);}
+    tctx.putImageData(f.imageData,0,0,0,0,100,75);
+    div.appendChild(tn);panel.appendChild(div);
+
+    div.addEventListener('click',()=>switchFrame(i));
+    div.addEventListener('dragstart',e=>e.dataTransfer.setData('text',i));
+    div.addEventListener('dragover',e=>e.preventDefault());
+    div.addEventListener('drop',e=>{
+      e.preventDefault();const from=+e.dataTransfer.getData('text'),to=i;
+      const fm=frames.splice(from,1)[0],hm=histories.splice(from,1)[0];
+      frames.splice(to,0,fm);histories.splice(to,0,hm);
+      if(current===from)current=to;
+      else if(from<current&&to>=current)current--;
+      else if(from>current&&to<=current)current++;
+      updateUI();
+    });
+  });
+}
+
+// Flood fill
+function hexToRgb(h){h=h.replace('#','');const v=parseInt(h,16);return[(v>>16)&255,(v>>8)&255,v&255,255];}
+function floodFill(x,y){
+  const img=ctx.getImageData(0,0,cw,ch),d=img.data,w=cw,h=ch,start=(y*w+x)*4;
+  const tc=[d[start],d[start+1],d[start+2],d[start+3]],fc=hexToRgb(color);
+  if(tc.every((v,i)=>v===fc[i]))return;
+  const stack=[[x,y]];
+  while(stack.length){
+    let [cx,cy]=stack.pop(),px=(cy*w+cx)*4;
+    while(cy>=0&&d[px]===tc[0]&&d[px+1]===tc[1]&&d[px+2]===tc[2]&&d[px+3]===tc[3]){
+      cy--;px=(cy*w+cx)*4;
+    }
+    cy++;px=(cy*w+cx)*4;
+    let left=false,right=false;
+    while(cy<h&&d[px]===tc[0]&&d[px+1]===tc[1]&&d[px+2]===tc[2]&&d[px+3]===tc[3]){
+      d[px]=fc[0];d[px+1]=fc[1];d[px+2]=fc[2];d[px+3]=255;
+      if(cx>0){
+        if(d[px-4]===tc[0]&&d[px-3]===tc[1]&&d[px-2]===tc[2]&&d[px-1]===tc[3]){
+          if(!left){stack.push([cx-1,cy]);left=true;}
+        } else left=false;
+      }
+      if(cx<w-1){
+        if(d[px+4]===tc[0]&&d[px+5]===tc[1]&&d[px+6]===tc[2]&&d[px+7]===tc[3]){
+          if(!right){stack.push([cx+1,cy]);right=true;}
+        } else right=false;
+      }
+      cy++;px=(cy*w+cx)*4;
+    }
+  }
+  ctx.putImageData(img,0,0);updateHistory();drawFrame();
+}
+
+// Pointer events
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);
+  const x=Math.floor(e.offsetX/canvas.clientWidth*cw),
+        y=Math.floor(e.offsetY/canvas.clientHeight*ch);
+  if(tool==='pen'||tool==='eraser'){
+    updateHistory();ctx.beginPath();ctx.moveTo(x,y);drawing=true;
+  } else if(tool==='bucket'){updateHistory();floodFill(x,y);}
+  else if(tool==='select'){
+    updateHistory();
+    selection={x,y,w:0,h:0,mode:'select',scale:1};
+  }
+});
+let drawing=false;
+canvas.addEventListener('pointermove',e=>{
+  const x=e.offsetX/canvas.clientWidth*cw,
+        y=e.offsetY/canvas.clientHeight*ch;
+  if(drawing && (tool==='pen'||tool==='eraser')){
+    ctx.lineTo(x,y);
+    ctx.strokeStyle = (tool==='eraser'?'#ffffff':color);
+    ctx.lineWidth = size;
+    ctx.lineCap = 'round';
+    ctx.globalCompositeOperation='source-over';
+    ctx.globalAlpha=1;
+    ctx.stroke();
+  } else if(selection && selection.mode==='select' && e.pressure>0){
+    selection.w = x-selection.x;
+    selection.h = y-selection.y;
+    drawFrame();
+    ctx.strokeStyle='red';ctx.setLineDash([6]);ctx.strokeRect(selection.x,selection.y,selection.w,selection.h);ctx.setLineDash([]);
+  }
+});
+canvas.addEventListener('pointerup',e=>{
+  drawing=false;
+  if(tool==='pen'||tool==='eraser'){
+    updateHistory();drawFrame();
+  } else if(selection && selection.mode==='select'){
+    // finalize selection
+    selection.w = Math.abs(selection.w);
+    selection.h = Math.abs(selection.h);
+    if(selection.w===0||selection.h===0){selection=null;return;}
+    let sx = Math.min(selection.x,selection.x+selection.w);
+    let sy = Math.min(selection.y,selection.y+selection.h);
+    selection.x=sx;selection.y=sy;
+    offscreen.width=selection.w;offscreen.height=selection.h;
+    offctx.putImageData(ctx.getImageData(selection.x,selection.y,selection.w,selection.h),0,0);
+    ctx.clearRect(selection.x,selection.y,selection.w,selection.h);
+    selection.mode='placed';
+    document.getElementById('scaleControls').style.display='flex';
+    drawFrame();
+    ctx.drawImage(offscreen,0,0,selection.w,selection.h,selection.x,selection.y,selection.w,selection.h);
+  }
+});
+
+// Toolbar
+document.getElementById('penBtn').onclick=()=>{tool='pen';ctx.globalCompositeOperation='source-over';};
+document.getElementById('eraserBtn').onclick=()=>{tool='eraser';ctx.globalCompositeOperation='destination-out';};
+document.getElementById('bucketBtn').onclick=()=>{tool='bucket';};
+document.getElementById('selectBtn').onclick=()=>{tool='select';};
+document.getElementById('undoBtn').onclick=()=>{
+  if(histories[current].length>1){
+    histories[current].pop();
+    const img=histories[current].pop();
+    ctx.putImageData(img,0,0);frames[current].imageData=img;histories[current].push(img);
+    drawFrame();updateUI();
+  }
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('importInput').click();
+document.getElementById('importInput').onchange=e=>{
+  const file=e.target.files[0],url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{updateHistory();ctx.drawImage(img,0,0,cw,ch);drawFrame();}
+  img.src=url;
+};
+document.getElementById('bgImgBtn').onclick=()=>document.getElementById('bgImgInput').click();
+document.getElementById('bgImgInput').onchange=e=>{
+  const file=e.target.files[0],url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{
+    frames[current].backgroundImage=img;drawFrame();updateHistory();updateUI();
+  };img.src=url;
+};
+document.getElementById('bgColorPicker').onchange=e=>{
+  frames[current].backgroundColor=e.target.value;
+  frames[current].backgroundImage=null;
+  drawFrame();updateHistory();updateUI();
+};
+document.getElementById('addFrameBtn').onclick=()=>{
+  frames[current].imageData=ctx.getImageData(0,0,cw,ch);
+  frames.push(createEmptyFrame());
+  histories.push([]);current=frames.length-1;
+  drawFrame();updateHistory();updateUI();
+};
+document.getElementById('delFrameBtn').onclick=()=>{
+  if(frames.length>1){
+    frames.splice(current,1);histories.splice(current,1);
+    current=Math.max(0,current-1);
+    drawFrame();updateUI();
+  }
+};
+document.getElementById('fpsInput').onchange=e=>fps=+e.target.value;
+document.getElementById('onionCheckbox').onchange=e=>{onion=e.target.checked;drawFrame();};
+
+document.getElementById('scaleSlider').oninput=e=>{
+  selection.scale=e.target.value/100;
+  drawFrame();
+  ctx.drawImage(offscreen,0,0,selection.w,selection.h,selection.x,selection.y,selection.w*selection.scale,selection.h*selection.scale);
+};
+document.getElementById('placeBtn').onclick=()=>{
+  updateHistory();
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  ctx.drawImage(offscreen,0,0,selection.w,selection.h,selection.x,selection.y,selection.w*selection.scale,selection.h*selection.scale);
+  selection=null;
+  document.getElementById('scaleControls').style.display='none';
+  drawFrame();updateUI();
+};
+document.getElementById('cancelBtn').onclick=()=>{
+  selection=null;
+  document.getElementById('scaleControls').style.display='none';
+  drawFrame();
+};
+
+document.getElementById('previewBtn').onclick=()=>{
+  drawFrame();
+  let idx=0,iv=setInterval(()=>{
+    const f=frames[idx++];
+    pctx.clearRect(0,0,cw,ch);
+    if(f.backgroundImage)pctx.drawImage(f.backgroundImage,0,0,cw,ch);
+    else{pctx.fillStyle=f.backgroundColor;pctx.fillRect(0,0,cw,ch);}
+    pctx.putImageData(f.imageData,0,0);
+    if(idx>=frames.length){clearInterval(iv);pctx.clearRect(0,0,cw,ch);}
+  },1000/fps);
+};
+
+document.getElementById('downloadBtn').onclick=()=>{
+  const tmpC=document.createElement('canvas'),tctx=tmpC.getContext('2d');
+  tmpC.width=cw;tmpC.height=ch;
+  const stream=tmpC.captureStream(fps);
+  const opts=MediaRecorder.isTypeSupported('video/mp4')?{mimeType:'video/mp4'}:{mimeType:'video/webm'};
+  const rec=new MediaRecorder(stream,opts),chunks=[];
+  rec.ondataavailable=e=>chunks.push(e.data);
+  rec.onstop=()=>{
+    const blob=new Blob(chunks,{type:opts.mimeType});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='animation.'+(opts.mimeType.includes('mp4')?'mp4':'webm');a.click();
+  };
+  rec.start();
+  let i=0,iv=setInterval(()=>{
+    const f=frames[i++];
+    tctx.clearRect(0,0,cw,ch);
+    if(f.backgroundImage)tctx.drawImage(f.backgroundImage,0,0,cw,ch);
+    else{tctx.fillStyle=f.backgroundColor;tctx.fillRect(0,0,cw,ch);}
+    tctx.putImageData(f.imageData,0,0);
+    if(i>=frames.length){clearInterval(iv);rec.stop();}
+  },1000/fps);
+};
+
+document.getElementById('saveBtn').onclick=()=>{
+  const proj={fps,frames:frames.map(f=>{
+    const c=document.createElement('canvas'),cctx=c.getContext('2d');
+    c.width=cw;c.height=ch;
+    if(f.backgroundImage)cctx.drawImage(f.backgroundImage,0,0,cw,ch);
+    else{cctx.fillStyle=f.backgroundColor;cctx.fillRect(0,0,cw,ch);}
+    cctx.putImageData(f.imageData,0,0);
+    return {img:c.toDataURL(),bgColor:f.backgroundColor,bgImgSrc:f.backgroundImage?f.backgroundImage.src:null};
+  })};
+  localStorage.setItem('animProj',JSON.stringify(proj));
+  alert('Project saved locally');
+};
+document.getElementById('loadBtn').onclick=async()=>{
+  const data=localStorage.getItem('animProj');
+  if(!data)return alert('No saved project');
+  const proj=JSON.parse(data);
+  frames=[];histories=[];fps=proj.fps;document.getElementById('fpsInput').value=fps;
+  for(const fr of proj.frames){
+    const img=new Image();await new Promise(r=>{img.onload=r;img.src=fr.img;});
+    const bgImg=new Image();if(fr.bgImgSrc)await new Promise(r=>{bgImg.onload=r;bgImg.src=fr.bgImgSrc;});else bgImg=null;
+    ctx.clearRect(0,0,cw,ch);
+    if(bgImg)ctx.drawImage(bgImg,0,0,cw,ch);
+    else{ctx.fillStyle=fr.bgColor;ctx.fillRect(0,0,cw,ch);}
+    ctx.putImageData(ctx.getImageData(0,0,cw,ch),0,0);
+    const dataImg=ctx.getImageData(0,0,cw,ch);
+    frames.push({imageData:dataImg,backgroundColor:fr.bgColor,backgroundImage:bgImg});
+    histories.push([]);current=frames.length-1;
+    updateHistory();
+  }
+  current=0;drawFrame();updateUI();
+};
+
+init();})();
+</script>
 </body>
 </html>
+
