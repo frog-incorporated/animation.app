@@ -3,366 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Animation App</title>
+    <title>Animator Pro (Single File Edition)</title>
     <style>
         /* --- Reset & Base --- */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        html, body {
-            height: 100%;
-            overflow: hidden; /* Prevent body scrollbars */
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
-            background-color: #f4f7f9;
-            color: #333;
+            background-color: #f8f9fa; /* Lighter overall background */
+            color: #212529;
             font-size: 14px;
         }
-
-        button, input, select {
-            font-family: inherit;
-            font-size: inherit;
-        }
+        button, input, select { font-family: inherit; font-size: inherit; }
+        :disabled { cursor: not-allowed !important; opacity: 0.6; }
 
         /* --- Layout --- */
-        #app-container {
-            display: flex;
-            flex-grow: 1;
-            overflow: hidden; /* Contain content */
-            height: calc(100vh - 120px); /* Adjust based on combined timeline height */
-        }
-
+        #app-container { display: flex; flex-grow: 1; overflow: hidden; height: calc(100vh - 125px); } /* Adjusted height */
         #toolbar {
-            width: 180px; /* Slightly wider toolbar */
+            width: 200px; /* Wider toolbar */
             flex-shrink: 0;
-            background-color: #e9edf0;
-            border-right: 1px solid #d1d9e0;
-            padding: 15px 10px;
+            background-color: #e9ecef; /* Slightly darker toolbar bg */
+            border-right: 1px solid #dee2e6;
+            padding: 15px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 15px; /* Space between sections */
+            gap: 18px; /* Increased gap */
         }
-
-        #main-area {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
+        #main-area { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; background-color: #adb5bd; /* Area around canvas */ }
         #canvas-container {
             flex-grow: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: #d8dfe4; /* Slightly muted background */
-            overflow: auto; /* Scrollbars if canvas is larger */
+            overflow: auto;
             position: relative;
+            padding: 10px; /* Padding around canvas */
         }
-
         #drawingCanvas {
-            border: 1px solid #a0a8b0;
+            border: 1px solid #495057;
             cursor: crosshair;
-            background-color: #ffffff; /* Default canvas background */
+            background-color: #ffffff;
             display: block;
-            max-width: 100%; /* Ensure canvas doesn't overflow container horizontally */
-            max-height: 100%;/* Ensure canvas doesn't overflow container vertically */
-            object-fit: contain; /* Scale canvas down if needed, maintaining aspect ratio */
-            image-rendering: pixelated; /* Keep pixels sharp */
+            object-fit: contain;
+            image-rendering: pixelated; /* Keep pixels sharp, especially important for selection */
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            /* Width/Height set by JS */
         }
-
-        /* Onion skin and selection canvases positioned over main canvas */
-        #onionSkinCanvasUnder,
-        #onionSkinCanvasOver,
-        #selectionCanvas {
+        #onionSkinCanvasUnder, #onionSkinCanvasOver, #selectionCanvas {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
             pointer-events: none;
-            max-width: 100%;
-            max-height: 100%;
             object-fit: contain;
             image-rendering: pixelated;
-             /* Size set by JS */
+            /* Top/Left/Width/Height set by JS */
         }
-        #onionSkinCanvasUnder { opacity: 0.25; }
-        #onionSkinCanvasOver { opacity: 0.25; }
-        #selectionCanvas { border: 1px dashed #007bff; display: none; }
-
+        #onionSkinCanvasUnder, #onionSkinCanvasOver { opacity: 0.25; }
+        #selectionCanvas { border: 1px dashed #0d6efd; display: none; }
 
         #timeline-container {
-            height: 120px; /* Fixed height */
-            background-color: #e9edf0;
-            border-top: 1px solid #d1d9e0;
+            height: 125px; /* Slightly taller timeline */
+            background-color: #e9ecef;
+            border-top: 1px solid #dee2e6;
             display: flex;
             align-items: center;
-            padding: 10px;
+            padding: 10px 15px;
             overflow-x: auto;
             overflow-y: hidden;
         }
 
         /* --- Toolbar Elements --- */
-        .tool-section {
-            padding-bottom: 10px;
-            border-bottom: 1px solid #d1d9e0;
-        }
-        .tool-section:last-child {
-            border-bottom: none;
-        }
-
+        .tool-section { padding-bottom: 10px; border-bottom: 1px solid #ced4da; }
+        .tool-section:last-child { border-bottom: none; }
         .tool-section h4 {
-            margin-bottom: 8px;
-            font-size: 0.9em;
-            font-weight: 600;
-            color: #555;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            margin-bottom: 10px; font-size: 0.9em; font-weight: 600; color: #495057;
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
-
-        #toolbar button,
-        .timeline-control button, /* Target timeline controls */
-        #file-controls button,
-        #background-controls button {
-            display: flex; /* Align icon/text */
-            align-items: center;
-            justify-content: center;
-            gap: 5px; /* Space between icon/text */
-            width: 100%;
-            padding: 8px 10px;
-            margin-bottom: 6px;
-            background-color: #fff;
-            border: 1px solid #c5ced6;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.95em;
-            text-align: center;
-            transition: background-color 0.2s ease, border-color 0.2s ease;
+        #toolbar button, .timeline-control button, .file-control button, .background-control button, .selection-action button {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            width: 100%; padding: 9px 10px; margin-bottom: 8px;
+            background-color: #fff; border: 1px solid #adb5bd; border-radius: 5px;
+            cursor: pointer; font-size: 0.95em; text-align: center;
+            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
-
-        #toolbar button:hover,
-        .timeline-control button:hover,
-        #file-controls button:hover,
-        #background-controls button:hover {
-            background-color: #f8f9fa;
-            border-color: #a0a8b0;
+        #toolbar button:hover, .timeline-control button:hover, .file-control button:hover, .background-control button:hover, .selection-action button:hover {
+            background-color: #f8f9fa; border-color: #6c757d;
         }
-
         #toolbar button.active {
-            background-color: #d1e7ff;
-            border-color: #a6cfff;
-            font-weight: 600;
-            color: #0056b3;
+            background-color: #cfe2ff; border-color: #9ec5fe; font-weight: 600; color: #0a58ca;
+            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
         }
-
-        #toolbar button:disabled,
-        .timeline-control button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background-color: #e9ecef;
+        #toolbar button:disabled, .timeline-control button:disabled, .selection-action button:disabled {
+            background-color: #f8f9fa; border-color: #ced4da; color: #6c757d;
+            opacity: 0.7;
         }
-
-
-        #toolbar input[type="color"],
-        #toolbar input[type="range"],
-        #toolbar input[type="number"],
-        #toolbar input[type="file"],
-        #background-controls input[type="color"] {
-            width: 100%;
-            margin-bottom: 8px;
-            padding: 5px;
-            border: 1px solid #c5ced6;
-            border-radius: 4px;
+        #toolbar input[type="color"], #toolbar input[type="range"], #toolbar input[type="number"], .background-control input[type="color"] {
+            width: 100%; margin-bottom: 8px; padding: 6px 8px; border: 1px solid #adb5bd; border-radius: 4px;
         }
-        #toolbar input[type="color"] {
-            height: 30px;
-            padding: 2px; /* Adjust padding for color input */
+        #toolbar input[type="color"] { height: 35px; padding: 3px; }
+        #toolbar input[type="file"] { display: none; }
+        #toolbar label, .background-control label, .canvas-setting label {
+            display: block; font-size: 0.85em; margin-bottom: 5px; color: #495057; font-weight: 500;
         }
-        #toolbar input[type="file"] {
-             display: none; /* Hide default file input */
-        }
+        .inline-label { display: inline-block; margin-right: 5px; vertical-align: middle;}
+        .input-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .input-group label { margin-bottom: 0; }
+        .input-group input[type="number"] { width: 65px; text-align: right; padding: 4px;}
 
-        #toolbar label, #background-controls label {
-            display: block;
-            font-size: 0.85em;
-            margin-bottom: 4px;
-            color: #555;
-            font-weight: 500;
-        }
-         .inline-label { display: inline-block; margin-right: 5px; }
-
-
-         #brush-size-container { display: flex; align-items: center; gap: 5px; margin-bottom: 8px;}
-         #brush-size { flex-grow: 1; }
-         #brush-size-label { font-size: 0.9em; min-width: 20px; text-align: right; }
-
+        #brush-size-container { display: flex; align-items: center; gap: 8px; margin-bottom: 8px;}
+        #brush-size { flex-grow: 1; }
+        #brush-size-label { font-size: 0.9em; min-width: 25px; text-align: right; }
 
         /* --- Timeline Elements --- */
         #timeline-controls {
-            display: flex;
-            flex-direction: column; /* Stack buttons vertically */
-            justify-content: center; /* Center buttons */
-            padding-right: 10px;
-            margin-right: 10px;
-            border-right: 1px solid #d1d9e0;
-            height: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+            padding-right: 15px; margin-right: 15px; border-right: 1px solid #ced4da; height: 100%;
         }
-         .timeline-control button {
-            width: 90px; /* Adjust width as needed */
-            height: 30px;
-            padding: 5px;
-            font-size: 0.85em;
-            margin-bottom: 5px;
-         }
+         .timeline-control button { width: 100px; height: 32px; padding: 5px; font-size: 0.9em; margin-bottom: 6px; }
          .timeline-control button:last-child { margin-bottom: 0; }
-
-
-         #frames {
-            display: flex;
-            height: 100%;
-            align-items: center;
-            gap: 8px; /* Space between frames */
-            padding-bottom: 5px; /* Prevent scrollbar overlap */
-         }
+         #frames { display: flex; height: 100%; align-items: center; gap: 10px; padding-bottom: 5px; }
         .frame {
-            border: 2px solid #a0a8b0;
-            width: 100px;
-            height: 80px;
-            cursor: pointer;
-            position: relative;
-            background-color: #fff; /* Base background for thumbnail */
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            flex-shrink: 0;
-            border-radius: 3px;
-            overflow: hidden; /* Clip content like delete button */
-             display: flex; /* Center potential placeholder text */
-            justify-content: center;
-            align-items: center;
-            transition: border-color 0.2s ease;
+            border: 2px solid #adb5bd; width: 110px; height: 90px; /* Larger thumbnails */
+            cursor: pointer; position: relative; background-color: #fff;
+            background-size: contain; background-repeat: no-repeat; background-position: center;
+            flex-shrink: 0; border-radius: 4px; overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .frame:hover {
-             border-color: #007bff;
-        }
-        .frame.active-frame {
-            border-color: #0056b3;
-            box-shadow: 0 0 0 2px rgba(0, 86, 179, 0.5);
-        }
+        .frame:hover { border-color: #0d6efd; }
+        .frame.active-frame { border-color: #0a58ca; box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.35); }
          .frame-number {
-             position: absolute;
-             bottom: 3px;
-             right: 5px;
-             background-color: rgba(0, 0, 0, 0.65);
-             color: white;
-             font-size: 0.75em;
-             padding: 1px 4px;
-             border-radius: 3px;
+             position: absolute; bottom: 4px; right: 6px; background-color: rgba(0, 0, 0, 0.7);
+             color: white; font-size: 0.8em; padding: 2px 5px; border-radius: 3px;
          }
          .delete-frame {
-            position: absolute;
-            top: 2px;
-            right: 2px;
-            width: 18px;
-            height: 18px;
-            background-color: rgba(220, 53, 69, 0.8); /* Red */
-            color: white;
-            border: none;
-            border-radius: 50%;
-            font-size: 12px;
-            line-height: 18px;
-            text-align: center;
-            cursor: pointer;
-            opacity: 0; /* Hidden by default */
-            transition: opacity 0.2s ease;
+            position: absolute; top: 3px; right: 3px; width: 20px; height: 20px;
+            background-color: rgba(220, 53, 69, 0.8); color: white; border: none;
+            border-radius: 50%; font-size: 13px; line-height: 20px; text-align: center;
+            cursor: pointer; opacity: 0; transition: opacity 0.2s ease; z-index: 1;
          }
-         .frame:hover .delete-frame {
-             opacity: 1;
-         }
-         .delete-frame:hover {
-             background-color: rgba(200, 33, 49, 1);
-         }
+         .frame:hover .delete-frame { opacity: 1; }
+         .delete-frame:hover { background-color: rgba(200, 33, 49, 1); }
 
-
-        /* --- Playback & Other Controls --- */
-         #playback-controls, #background-controls, #file-controls, #onion-skin-controls {
-             display: flex;
-             flex-wrap: wrap; /* Allow wrapping if needed */
-             align-items: center;
-             gap: 8px; /* Spacing between items */
-         }
-         #playback-controls label, #background-controls label, #onion-skin-controls label {
-             font-size: 0.85em;
-             white-space: nowrap;
-         }
-         #playback-controls input[type="number"],
-         #onion-skin-controls input[type="number"] {
-             width: 55px;
-             padding: 4px;
-         }
-         #background-controls input[type="color"] { width: 40px; height: 30px; padding: 1px; margin-bottom: 0; }
-         #background-controls button { width: auto; padding: 6px 10px; font-size: 0.9em; margin-bottom: 0; }
-
-         /* Status message */
-         #export-status {
-            font-size: 0.85em;
-            color: #0056b3;
-            margin-top: 5px;
-            min-height: 1.2em; /* Reserve space */
-         }
-
+        /* --- Specific Controls --- */
+         #playback-controls, #onion-skin-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+         #playback-controls label, #onion-skin-controls label { font-size: 0.85em; }
+         #playback-controls input[type="number"], #onion-skin-controls input[type="number"] { width: 60px; padding: 4px; }
+         .background-control input[type="color"] { width: 40px; height: 30px; padding: 1px; margin-bottom: 0; vertical-align: middle;}
+         .background-control button { width: auto; padding: 6px 10px; font-size: 0.9em; margin-bottom: 0; vertical-align: middle;}
+         #export-status { font-size: 0.85em; color: #0d6efd; margin-top: 5px; min-height: 1.2em; }
+         .hidden { display: none !important; } /* Utility class */
 
         /* --- Mobile Adjustments --- */
         @media (max-width: 768px) {
-             html, body { height: auto; overflow: visible; } /* Allow scrolling on mobile */
-            #app-container {
-                flex-direction: column;
-                height: auto;
-            }
+             html, body { height: auto; overflow: visible; font-size: 13px; }
+            #app-container { flex-direction: column; height: auto; }
             #toolbar {
-                width: 100%;
-                order: 1; /* Toolbar below canvas */
-                border-right: none;
-                border-top: 1px solid #d1d9e0; /* Border on top now */
-                flex-direction: row; /* Horizontal scroll */
-                flex-wrap: nowrap; /* Prevent wrapping */
-                overflow-x: auto;
-                padding: 5px;
-                gap: 10px;
+                width: 100%; order: 2; /* Toolbar comes after timeline */
+                border-right: none; border-top: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6;
+                flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
+                padding: 8px; gap: 12px; align-items: center;
             }
-            #toolbar .tool-section {
-                 flex-shrink: 0; /* Prevent sections from shrinking */
-                 padding-bottom: 0;
-                 border-bottom: none;
-                 margin-bottom: 0;
-            }
-            #toolbar .tool-section h4 { display: none; } /* Hide titles */
-            #toolbar button { width: auto; font-size: 0.9em; padding: 6px 8px; }
-            #toolbar label { display: none; } /* Hide most labels */
-            #toolbar input[type="color"] { width: 35px; height: 30px; }
-             #brush-size-container { width: 100px; margin-bottom: 0;}
+            #toolbar .tool-section { flex-shrink: 0; padding-bottom: 0; border-bottom: none; margin-bottom: 0; }
+            #toolbar .tool-section h4 { display: none; }
+            #toolbar button { width: auto; font-size: 0.9em; padding: 8px 10px; min-width: 44px; height: 40px; margin-bottom: 0;} /* Touch target size */
+            #toolbar label { display: none; }
+            #toolbar input[type="color"] { width: 40px; height: 35px; }
+             #brush-size-container { width: 120px; margin-bottom: 0;}
+             .input-group input[type="number"] { width: 55px; }
 
-            #main-area {
-                order: 0; /* Canvas first */
-                 height: calc(60vh); /* Example height, adjust as needed */
-            }
-            #timeline-container {
-                order: 2; /* Timeline last */
-                height: 100px;
-            }
-            .frame {
-                width: 80px;
-                height: 60px;
-            }
-             .timeline-control button { width: 80px; }
+
+            #main-area { order: 0; height: calc(65vh); } /* Adjust height as needed */
+            #timeline-container { order: 1; height: 110px; padding: 8px; }
+            .frame { width: 90px; height: 70px; }
+            #timeline-controls { padding-right: 10px; margin-right: 10px; }
+             .timeline-control button { width: 85px; height: 30px; font-size: 0.8em; }
         }
     </style>
 </head>
@@ -371,12 +187,31 @@
     <div id="app-container">
         <div id="toolbar">
             <div class="tool-section">
+                <h4>Canvas</h4>
+                 <div class="input-group canvas-setting">
+                    <label for="canvas-width" class="inline-label">Width:</label>
+                    <input type="number" id="canvas-width" value="800" min="100" step="10"> px
+                 </div>
+                 <div class="input-group canvas-setting">
+                     <label for="canvas-height" class="inline-label">Height:</label>
+                    <input type="number" id="canvas-height" value="600" min="100" step="10"> px
+                 </div>
+                 <button id="apply-canvas-size">Apply Size</button>
+                 <small>Warning: Clears animation!</small>
+            </div>
+
+            <div class="tool-section">
                 <h4>Tools</h4>
                 <button id="pen-tool" class="tool active" title="Pen (P)">✏️ Pen</button>
                 <button id="eraser-tool" class="tool" title="Eraser (E)">🧼 Eraser</button>
                 <button id="paint-bucket-tool" class="tool" title="Paint Bucket (B)">🩸 Bucket</button>
-                <button id="select-tool" class="tool" title="Select Tool (S) - Basic Box">✂️ Select</button>
-                <button id="undo-button" title="Undo (Ctrl+Z)">↩️ Undo</button>
+                <button id="select-tool" class="tool" title="Select Tool (S)">✂️ Select</button>
+                 <div id="selection-actions" class="hidden">
+                    <button id="copy-button" class="selection-action" title="Copy Selection (Ctrl+C)">📝 Copy</button>
+                    <button id="paste-button" class="selection-action" title="Paste Selection (Ctrl+V)" disabled>📋 Paste</button>
+                    </div>
+                 <hr style="margin: 10px 0;">
+                <button id="undo-button" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>
             </div>
 
             <div class="tool-section">
@@ -403,7 +238,7 @@
 
             <div class="tool-section">
                 <h4>Background</h4>
-                 <div id="background-controls">
+                 <div class="background-control input-group">
                     <label for="bg-color-picker" class="inline-label">Color:</label>
                     <input type="color" id="bg-color-picker" value="#FFFFFF" title="Background Color">
                     <button id="set-bg-color">Set</button>
@@ -414,7 +249,7 @@
 
              <div class="tool-section">
                 <h4>Project</h4>
-                <div id="file-controls">
+                <div class="file-control">
                     <button id="save-button" title="Save Project File (.animproj)">💾 Save</button>
                      <input type="file" id="load-input" accept=".json, .animproj">
                      <button onclick="document.getElementById('load-input').click();" title="Load Project File">📂 Load</button>
@@ -459,15 +294,20 @@
     <script>
         // --- Globals & Constants ---
         const canvas = document.getElementById('drawingCanvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true }); // willReadFrequently for getImageData performance
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const onionCanvasUnder = document.getElementById('onionSkinCanvasUnder');
         const ctxOnionUnder = onionCanvasUnder.getContext('2d');
         const onionCanvasOver = document.getElementById('onionSkinCanvasOver');
         const ctxOnionOver = onionCanvasOver.getContext('2d');
         const selectionCanvas = document.getElementById('selectionCanvas');
         const ctxSelection = selectionCanvas.getContext('2d');
+        const selectionActionsDiv = document.getElementById('selection-actions');
+        const copyButton = document.getElementById('copy-button');
+        const pasteButton = document.getElementById('paste-button');
 
-        const MAX_UNDO_STEPS = 30; // Increased undo steps
+        const MAX_UNDO_STEPS = 30;
+        const DEFAULT_CANVAS_WIDTH = 800;
+        const DEFAULT_CANVAS_HEIGHT = 600;
 
         // --- State Variables ---
         let currentTool = 'pen';
@@ -491,11 +331,19 @@
         let selectionActive = false;
         let mediaRecorder = null;
         let recordedChunks = [];
+        let clipboardData = null; // Holds ImageData for copy/paste
+        let currentCanvasWidth = DEFAULT_CANVAS_WIDTH;
+        let currentCanvasHeight = DEFAULT_CANVAS_HEIGHT;
+
 
         // --- Initialization ---
         function initialize() {
             console.log("Initializing Animation App...");
-            resizeCanvas();
+            // Set initial dimensions from inputs or defaults
+            currentCanvasWidth = parseInt(document.getElementById('canvas-width').value) || DEFAULT_CANVAS_WIDTH;
+            currentCanvasHeight = parseInt(document.getElementById('canvas-height').value) || DEFAULT_CANVAS_HEIGHT;
+            setCanvasDimensions(currentCanvasWidth, currentCanvasHeight, true); // Initial set, no warning
+
             frames = [createBlankImageData()];
             currentFrameIndex = 0;
             loadFrame(currentFrameIndex);
@@ -507,6 +355,8 @@
         }
 
         function setupUI() {
+             document.getElementById('canvas-width').value = currentCanvasWidth;
+             document.getElementById('canvas-height').value = currentCanvasHeight;
             document.getElementById('pen-tool').classList.add('active');
             document.getElementById('brush-size').value = brushSize;
             document.getElementById('brush-size-label').textContent = brushSize;
@@ -516,71 +366,75 @@
             document.getElementById('onion-skin-before').value = onionSkinBefore;
             document.getElementById('onion-skin-after').value = onionSkinAfter;
             document.getElementById('undo-button').disabled = true;
+            pasteButton.disabled = !clipboardData; // Disable paste initially
+             selectionActionsDiv.classList.add('hidden'); // Hide copy/paste buttons
         }
 
         function createBlankImageData() {
-            return ctx.createImageData(canvas.width, canvas.height);
+            return ctx.createImageData(currentCanvasWidth, currentCanvasHeight);
         }
 
         // --- Canvas & Context ---
-        function resizeCanvas() {
-            const container = document.getElementById('canvas-container');
-            // Maintain a fixed aspect ratio (e.g., 4:3) or use fixed dimensions
-            const aspectRatio = 4 / 3;
-            let newWidth = container.clientWidth - 40; // Some padding
-            let newHeight = container.clientHeight - 40;
-
-            if (newWidth / newHeight > aspectRatio) {
-                newWidth = newHeight * aspectRatio;
-            } else {
-                newHeight = newWidth / aspectRatio;
-            }
-            newWidth = Math.max(100, Math.floor(newWidth)); // Min size
-            newHeight = Math.max(75, Math.floor(newHeight));
-
-             // Set internal resolution
-             canvas.width = newWidth;
-             canvas.height = newHeight;
-             onionCanvasUnder.width = newWidth;
-             onionCanvasUnder.height = newHeight;
-             onionCanvasOver.width = newWidth;
-             onionCanvasOver.height = newHeight;
-             selectionCanvas.width = newWidth;
-             selectionCanvas.height = newHeight;
-
-             // Set display size (CSS handles scaling via max-width/height)
-             canvas.style.width = `${newWidth}px`;
-             canvas.style.height = `${newHeight}px`;
-             onionCanvasUnder.style.width = `${newWidth}px`;
-             onionCanvasUnder.style.height = `${newHeight}px`;
-             onionCanvasOver.style.width = `${newWidth}px`;
-             onionCanvasOver.style.height = `${newHeight}px`;
-             selectionCanvas.style.width = `${newWidth}px`;
-             selectionCanvas.style.height = `${newHeight}px`;
-
-            // Re-render after resize
-             if (frames.length > 0) {
-                 // Optional: Resize existing frame data (complex, involves resampling)
-                 // Simple approach: Just reload current frame (may clear if size changed drastically)
-                 loadFrame(currentFrameIndex);
-                 drawOnionSkins();
+        function setCanvasDimensions(width, height, isInitialSetup = false) {
+             if (!isInitialSetup && frames.length > 0 && (width !== currentCanvasWidth || height !== currentCanvasHeight)) {
+                 if (!confirm(`Changing canvas size to ${width}x${height} will clear your current animation. Continue?`)) {
+                     // Reset input fields if user cancels
+                     document.getElementById('canvas-width').value = currentCanvasWidth;
+                     document.getElementById('canvas-height').value = currentCanvasHeight;
+                     return; // Stop if user cancels
+                 }
+                 // Clear animation if size changes and confirmed
+                 frames = [];
+                 clipboardData = null; // Clear clipboard too
+                 clearUndoStack();
+                 console.log("Animation cleared due to canvas resize.");
              }
-             // Recalculate positions of overlay canvases (needed if container size changes)
-             positionOverlayCanvases();
+
+             currentCanvasWidth = width;
+             currentCanvasHeight = height;
+
+             // Update internal resolution for all canvases
+             [canvas, onionCanvasUnder, onionCanvasOver, selectionCanvas].forEach(c => {
+                 c.width = width;
+                 c.height = height;
+                 // Update display style (CSS handles scaling via object-fit)
+                 c.style.width = `${width}px`;
+                 c.style.height = `${height}px`;
+             });
+
+             // Reset/recreate initial frame if animation was cleared
+             if (frames.length === 0) {
+                 frames = [createBlankImageData()];
+                 currentFrameIndex = 0;
+                 loadFrame(0);
+                 updateTimeline();
+             } else {
+                 // If not cleared (e.g., initial setup), just reload current frame state
+                 loadFrame(currentFrameIndex);
+             }
+
+             drawOnionSkins(); // Redraw onion skins for new size
+             positionOverlayCanvases(); // Reposition overlays
+
+             console.log(`Canvas size set to ${width}x${height}`);
         }
 
+
         function positionOverlayCanvases() {
-            // This ensures overlays are centered correctly, especially after resize
-            const rect = canvas.getBoundingClientRect(); // Use main canvas position
-            const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
+             // Adjust overlays based on the main canvas's *rendered* position and size
+             requestAnimationFrame(() => { // Ensure layout is calculated
+                 const rect = canvas.getBoundingClientRect();
+                 const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
+                 const topOffset = rect.top - containerRect.top;
+                 const leftOffset = rect.left - containerRect.left;
 
-             const topOffset = rect.top - containerRect.top;
-             const leftOffset = rect.left - containerRect.left;
-
-             [onionCanvasUnder, onionCanvasOver, selectionCanvas].forEach(overlay => {
-                 overlay.style.top = `${topOffset}px`;
-                 overlay.style.left = `${leftOffset}px`;
-                 overlay.style.transform = 'none'; // Reset transform if using top/left positioning
+                 [onionCanvasUnder, onionCanvasOver, selectionCanvas].forEach(overlay => {
+                     overlay.style.top = `${topOffset}px`;
+                     overlay.style.left = `${leftOffset}px`;
+                     overlay.style.width = `${rect.width}px`; // Match rendered size
+                     overlay.style.height = `${rect.height}px`;
+                     overlay.style.transform = 'none';
+                 });
              });
         }
 
@@ -589,18 +443,19 @@
             targetCtx.clearRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
         }
 
-        function drawBackground(targetCtx = ctx) {
+        function drawBackground(targetCtx = ctx, targetWidth = currentCanvasWidth, targetHeight = currentCanvasHeight) {
             if (backgroundImage) {
-                targetCtx.drawImage(backgroundImage, 0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
+                targetCtx.drawImage(backgroundImage, 0, 0, targetWidth, targetHeight);
             } else {
                 targetCtx.fillStyle = backgroundColor;
-                targetCtx.fillRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
+                targetCtx.fillRect(0, 0, targetWidth, targetHeight);
             }
         }
 
         // --- Drawing Logic ---
         function getCanvasPos(evt) {
             const rect = canvas.getBoundingClientRect();
+            // Important: Use canvas.width/height (internal resolution) not rect.width/height
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             let clientX, clientY;
@@ -620,47 +475,51 @@
         }
 
         function startAction(e) {
-            e.preventDefault(); // Prevent unwanted default actions (like text selection)
+            e.preventDefault();
             const pos = getCanvasPos(e);
 
-             if (currentTool === 'select') {
-                 isSelecting = true;
-                 selectionActive = false;
-                 selectionRect.x = pos.x;
-                 selectionRect.y = pos.y;
-                 selectionRect.w = 0;
-                 selectionRect.h = 0;
-                 selectionCanvas.style.display = 'block';
-                 drawSelectionRectangle();
-             } else if (currentTool === 'paint-bucket') {
-                  saveUndoState(); // Save state BEFORE filling
-                  paintBucketFill(pos.x, pos.y);
-                  saveCurrentFrameData(); // Store modified data
-                  saveCurrentFrameThumbnail(); // Update thumbnail
-             } else { // Pen or Eraser
-                 saveUndoState();
-                 isDrawing = true;
-                 [lastX, lastY] = [pos.x, pos.y];
-                 draw(e); // Draw a dot on initial click
-             }
+            if (currentTool === 'select') {
+                // If clicking outside an existing selection, start a new one
+                if (!selectionActive || !isPointInSelection(pos.x, pos.y)) {
+                     isSelecting = true;
+                     selectionActive = false; // Deactivate old selection visually
+                     selectionRect.x = pos.x;
+                     selectionRect.y = pos.y;
+                     selectionRect.w = 0;
+                     selectionRect.h = 0;
+                     selectionCanvas.style.display = 'block';
+                     selectionActionsDiv.classList.add('hidden'); // Hide actions while drawing new selection
+                     drawSelectionRectangle();
+                } else {
+                     // TODO: Implement move/resize logic here if clicking *inside* active selection
+                     console.log("Clicked inside active selection (move/resize not implemented)");
+                }
+            } else if (currentTool === 'paint-bucket') {
+                clearSelectionRectangle(); // Clear selection if using bucket
+                saveUndoState();
+                paintBucketFill(pos.x, pos.y);
+                saveCurrentFrameData();
+                saveCurrentFrameThumbnail();
+            } else { // Pen or Eraser
+                clearSelectionRectangle(); // Clear selection if drawing
+                saveUndoState();
+                isDrawing = true;
+                [lastX, lastY] = [pos.x, pos.y];
+                draw(e);
+            }
         }
 
         function performAction(e) {
              if (!isDrawing && !isSelecting) return;
-             e.preventDefault(); // Prevent scrolling on touch devices while drawing/selecting
+             e.preventDefault();
              const pos = getCanvasPos(e);
 
             if (isDrawing) {
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 ctx.globalCompositeOperation = (currentTool === 'eraser') ? 'destination-out' : 'source-over';
-                ctx.strokeStyle = (currentTool === 'eraser') ? 'rgba(0,0,0,1)' : currentColor; // Eraser needs opaque color for destination-out
+                ctx.strokeStyle = (currentTool === 'eraser') ? 'rgba(0,0,0,1)' : currentColor;
                 ctx.lineWidth = brushSize;
-
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y); ctx.stroke();
                 [lastX, lastY] = [pos.x, pos.y];
             } else if (isSelecting) {
                 selectionRect.w = pos.x - selectionRect.x;
@@ -672,260 +531,228 @@
         function endAction(e) {
             if (isDrawing) {
                 isDrawing = false;
-                ctx.globalCompositeOperation = 'source-over'; // Reset blend mode
-                saveCurrentFrameData(); // Save drawn data
+                ctx.globalCompositeOperation = 'source-over';
+                saveCurrentFrameData();
                 saveCurrentFrameThumbnail();
             }
             if (isSelecting) {
                 isSelecting = false;
                 const normRect = getNormalizedSelectionRect();
-                if (normRect.w > 2 && normRect.h > 2) { // Require minimal size
+                if (normRect.w > 2 && normRect.h > 2) {
                      selectionActive = true;
-                     console.log("Selection Area (basic):", normRect);
-                     // Basic selection box is drawn. Full manipulation not implemented.
+                     console.log("Selection Area:", normRect);
+                     selectionActionsDiv.classList.remove('hidden'); // Show copy/paste buttons
+                     copyButton.disabled = false;
                  } else {
                      clearSelectionRectangle(); // Clear if selection too small
                  }
             }
         }
 
-        // --- Selection Tool ---
+        // --- Selection Tool & Copy/Paste ---
         function drawSelectionRectangle() {
             clearCanvas(ctxSelection);
             const rect = getNormalizedSelectionRect();
-            ctxSelection.setLineDash([4, 2]);
-            ctxSelection.strokeStyle = '#007bff';
+            ctxSelection.setLineDash([5, 3]);
+            ctxSelection.strokeStyle = '#0d6efd';
             ctxSelection.lineWidth = 1;
-            ctxSelection.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w, rect.h); // Offset by 0.5 for sharper lines
+            ctxSelection.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w, rect.h);
         }
 
         function clearSelectionRectangle() {
             clearCanvas(ctxSelection);
             selectionCanvas.style.display = 'none';
             selectionActive = false;
+             selectionActionsDiv.classList.add('hidden'); // Hide actions
+             copyButton.disabled = true;
+             // Keep paste button enabled if clipboard has data: pasteButton.disabled = !clipboardData;
         }
 
         function getNormalizedSelectionRect() {
-            let x = selectionRect.x;
-            let y = selectionRect.y;
-            let w = selectionRect.w;
-            let h = selectionRect.h;
-            if (w < 0) { x += w; w = -w; }
-            if (h < 0) { y += h; h = -h; }
-            return { x, y, w, h };
+            let x = Math.max(0, Math.min(selectionRect.x, selectionRect.x + selectionRect.w));
+             let y = Math.max(0, Math.min(selectionRect.y, selectionRect.y + selectionRect.h));
+             let w = Math.abs(selectionRect.w);
+             let h = Math.abs(selectionRect.h);
+
+             // Clamp to canvas bounds
+             if (x + w > currentCanvasWidth) w = currentCanvasWidth - x;
+             if (y + h > currentCanvasHeight) h = currentCanvasHeight - y;
+
+             return { x, y, w: Math.max(0, w), h: Math.max(0, h) }; // Ensure non-negative w/h
         }
 
-        // --- Paint Bucket ---
-        // Helper: Convert hex color string to RGBA array [r, g, b, a]
-        function hexToRgba(hex) {
-            if (!hex) return [0, 0, 0, 0]; // Handle null/empty case
-            hex = hex.replace('#', '');
-            const r = parseInt(hex.slice(0, 2), 16);
-            const g = parseInt(hex.slice(2, 4), 16);
-            const b = parseInt(hex.slice(4, 6), 16);
-            return [r, g, b, 255]; // Assume full alpha
-        }
-
-        // Helper: Get RGBA color of a pixel from ImageData
-        function getPixelColor(imageData, x, y) {
-            if (x < 0 || x >= imageData.width || y < 0 || y >= imageData.height) {
-                return [-1, -1, -1, -1]; // Out of bounds
-            }
-            const offset = (y * imageData.width + x) * 4;
-            return [
-                imageData.data[offset],
-                imageData.data[offset + 1],
-                imageData.data[offset + 2],
-                imageData.data[offset + 3]
-            ];
-        }
-
-        // Helper: Set RGBA color of a pixel in ImageData
-        function setPixelColor(imageData, x, y, color) {
-            const offset = (y * imageData.width + x) * 4;
-            imageData.data[offset] = color[0];
-            imageData.data[offset + 1] = color[1];
-            imageData.data[offset + 2] = color[2];
-            imageData.data[offset + 3] = color[3];
-        }
-
-        // Helper: Check if two colors match (simple exact match)
-         function colorsMatch(color1, color2) {
-             // Basic exact match. Could add tolerance later.
-             return color1[0] === color2[0] &&
-                    color1[1] === color2[1] &&
-                    color1[2] === color2[2] &&
-                    color1[3] === color2[3];
+         function isPointInSelection(x, y) {
+             if (!selectionActive) return false;
+             const rect = getNormalizedSelectionRect();
+             return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
          }
 
-        // Paint Bucket fill using Scan-line algorithm
-        function paintBucketFill(startX, startY) {
-             console.time("FloodFill"); // Start timing
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const width = imgData.width;
-            const height = imgData.height;
+         function copySelection() {
+             if (!selectionActive) return;
+             const rect = getNormalizedSelectionRect();
+             if (rect.w <= 0 || rect.h <= 0) return;
+
+             console.log(`Copying selection: ${rect.w}x${rect.h} at (${rect.x}, ${rect.y})`);
+
+             try {
+                const selectedAreaData = ctx.getImageData(rect.x, rect.y, rect.w, rect.h);
+                const drawingOnlyData = ctx.createImageData(rect.w, rect.h); // Start with transparent data
+                const data = selectedAreaData.data;
+                const newData = drawingOnlyData.data;
+                const bgRgba = hexToRgba(backgroundColor); // Get background color components
+
+                // --- Isolate Drawing Logic ---
+                // This simple version compares against the SOLID background color.
+                // It won't work well for image backgrounds or drawings matching the background color.
+                let hasContent = false;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const a = data[i + 3];
+
+                    let isBackgroundPixel = false;
+                    if (!backgroundImage && a > 0) { // Only check against solid background if no image bg
+                        // Check if pixel color matches solid background color (within a small tolerance maybe?)
+                         isBackgroundPixel = (r === bgRgba[0] && g === bgRgba[1] && b === bgRgba[2]);
+                    }
+
+                    // Copy pixel if it has alpha AND it's not considered part of the solid background
+                     // OR if there IS a background image (in which case we copy everything for now)
+                    if (a > 0 && (backgroundImage || !isBackgroundPixel)) {
+                        newData[i] = r;
+                        newData[i + 1] = g;
+                        newData[i + 2] = b;
+                        newData[i + 3] = a;
+                        hasContent = true; // Mark that we copied something
+                    } else {
+                        // Leave pixel transparent in newData (already initialized to transparent)
+                    }
+                }
+                // --- End Isolate Logic ---
+
+
+                if(hasContent) {
+                    clipboardData = drawingOnlyData;
+                    pasteButton.disabled = false; // Enable paste button
+                    console.log("Selection copied to clipboard.");
+                    // Optional: Visual feedback like flashing the selection border
+                } else {
+                    console.log("Selection appeared empty (or matched background), nothing copied.");
+                    clipboardData = null;
+                    pasteButton.disabled = true;
+                }
+
+             } catch (error) {
+                  console.error("Error copying selection:", error);
+                  alert("Could not copy selection. It might be outside the canvas bounds or too large.");
+                  clipboardData = null;
+                  pasteButton.disabled = true;
+             }
+         }
+
+         function pasteSelection() {
+             if (!clipboardData) return;
+
+             // Paste at top-left corner (0,0) for simplicity
+             const pasteX = 0;
+             const pasteY = 0;
+
+             console.log(`Pasting clipboard data (${clipboardData.width}x${clipboardData.height}) at (${pasteX}, ${pasteY})`);
+
+             saveUndoState(); // Save state before pasting
+             ctx.putImageData(clipboardData, pasteX, pasteY);
+             saveCurrentFrameData(); // Save modified frame
+             saveCurrentFrameThumbnail(); // Update thumbnail
+
+             // Optional: Clear selection after paste? Or allow multiple pastes?
+             // clearSelectionRectangle();
+         }
+
+
+        // --- Paint Bucket ---
+        // [Helper functions: hexToRgba, getPixelColor, setPixelColor, colorsMatch - unchanged from previous version]
+        function hexToRgba(hex) { if (!hex) return [0, 0, 0, 0]; hex = hex.replace('#', ''); const r = parseInt(hex.slice(0, 2), 16); const g = parseInt(hex.slice(2, 4), 16); const b = parseInt(hex.slice(4, 6), 16); return [r, g, b, 255]; }
+        function getPixelColor(imageData, x, y) { if (x < 0 || x >= imageData.width || y < 0 || y >= imageData.height) { return [-1, -1, -1, -1]; } const offset = (y * imageData.width + x) * 4; return [imageData.data[offset], imageData.data[offset + 1], imageData.data[offset + 2], imageData.data[offset + 3]]; }
+        function setPixelColor(imageData, x, y, color) { const offset = (y * imageData.width + x) * 4; imageData.data[offset] = color[0]; imageData.data[offset + 1] = color[1]; imageData.data[offset + 2] = color[2]; imageData.data[offset + 3] = color[3]; }
+        function colorsMatch(color1, color2) { return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3]; }
+
+        function paintBucketFill(startX, startY) { /* ... Paint bucket logic unchanged ... */
+            console.time("FloodFill");
+            const imgData = ctx.getImageData(0, 0, currentCanvasWidth, currentCanvasHeight);
+            const width = imgData.width; const height = imgData.height;
             const targetColor = getPixelColor(imgData, startX, startY);
             const fillColor = hexToRgba(currentColor);
-
-             // Handle edge cases
-             if (targetColor[0] === -1) { console.warn("Fill start is out of bounds"); return; } // Clicked outside
-             if (colorsMatch(targetColor, fillColor)) { console.log("Target and fill colors are the same."); return; } // Nothing to fill
+            if (targetColor[0] === -1) { console.warn("Fill start out of bounds"); return; }
+            if (colorsMatch(targetColor, fillColor)) { return; }
 
             const stack = [[startX, startY]];
-            const visited = new Uint8Array(width * height); // Use Uint8Array as a boolean flag (0 or 1)
+            const visited = new Uint8Array(width * height); // Use Uint8Array for memory efficiency
+            const targetR = targetColor[0], targetG = targetColor[1], targetB = targetColor[2], targetA = targetColor[3]; // Cache target color components
 
             while (stack.length > 0) {
                 const [x, y] = stack.pop();
                 let currentY = y;
-
-                // Move up until we are above the fill area or hit the top
-                while (currentY >= 0 && colorsMatch(getPixelColor(imgData, x, currentY), targetColor)) {
+                while (currentY >= 0) { // Go up first
+                    const pixelIndex = currentY * width + x;
+                     const offset = pixelIndex * 4;
+                    if(visited[pixelIndex] === 1 || imgData.data[offset] !== targetR || imgData.data[offset+1] !== targetG || imgData.data[offset+2] !== targetB || imgData.data[offset+3] !== targetA) break;
                     currentY--;
                 }
-                currentY++; // Move back into the fill area
+                 currentY++; // Move back into the valid fill row
 
-                let spanLeft = false;
-                let spanRight = false;
-
-                // Scan down, filling and checking neighbors
-                 while (currentY < height && colorsMatch(getPixelColor(imgData, x, currentY), targetColor)) {
+                let spanLeft = false; let spanRight = false;
+                 while (currentY < height) { // Scan down
                      const pixelIndex = currentY * width + x;
-                     if (visited[pixelIndex] === 0) { // Check if visited *before* coloring
-                         setPixelColor(imgData, x, currentY, fillColor);
-                         visited[pixelIndex] = 1; // Mark as visited
+                     const offset = pixelIndex * 4;
+                      if(visited[pixelIndex] === 1 || imgData.data[offset] !== targetR || imgData.data[offset+1] !== targetG || imgData.data[offset+2] !== targetB || imgData.data[offset+3] !== targetA) break; // Stop if color doesn't match or visited
 
-                         // Check left neighbor
-                         if (x > 0) {
-                             const leftColor = getPixelColor(imgData, x - 1, currentY);
-                              const leftIndex = currentY * width + (x - 1);
-                             if (colorsMatch(leftColor, targetColor) && visited[leftIndex] === 0) {
-                                 if (!spanLeft) {
-                                     stack.push([x - 1, currentY]);
-                                     spanLeft = true;
-                                 }
-                             } else if (spanLeft) {
-                                 spanLeft = false;
-                             }
-                         }
+                     setPixelColor(imgData, x, currentY, fillColor);
+                     visited[pixelIndex] = 1;
 
-                         // Check right neighbor
-                         if (x < width - 1) {
-                             const rightColor = getPixelColor(imgData, x + 1, currentY);
-                             const rightIndex = currentY * width + (x + 1);
-                             if (colorsMatch(rightColor, targetColor) && visited[rightIndex] === 0) {
-                                 if (!spanRight) {
-                                     stack.push([x + 1, currentY]);
-                                     spanRight = true;
-                                 }
-                             } else if (spanRight) {
-                                 spanRight = false;
-                             }
-                         }
+                     // Check Left
+                     if (x > 0) {
+                         const leftPixelIndex = currentY * width + (x - 1);
+                         const leftOffset = leftPixelIndex * 4;
+                         if (visited[leftPixelIndex] === 0 && imgData.data[leftOffset] === targetR && imgData.data[leftOffset+1] === targetG && imgData.data[leftOffset+2] === targetB && imgData.data[leftOffset+3] === targetA) {
+                             if (!spanLeft) { stack.push([x - 1, currentY]); spanLeft = true; }
+                         } else if (spanLeft) { spanLeft = false; }
+                     }
+                     // Check Right
+                     if (x < width - 1) {
+                         const rightPixelIndex = currentY * width + (x + 1);
+                         const rightOffset = rightPixelIndex * 4;
+                         if (visited[rightPixelIndex] === 0 && imgData.data[rightOffset] === targetR && imgData.data[rightOffset+1] === targetG && imgData.data[rightOffset+2] === targetB && imgData.data[rightOffset+3] === targetA) {
+                             if (!spanRight) { stack.push([x + 1, currentY]); spanRight = true; }
+                         } else if (spanRight) { spanRight = false; }
                      }
                      currentY++;
                  }
             }
-
-            // Put the modified data back onto the canvas
             ctx.putImageData(imgData, 0, 0);
-             console.timeEnd("FloodFill"); // End timing
+            console.timeEnd("FloodFill");
         }
 
 
         // --- Undo Logic ---
-        function saveUndoState() {
-             if (undoStack.length >= MAX_UNDO_STEPS) {
-                 undoStack.shift();
-             }
-             undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-             document.getElementById('undo-button').disabled = false;
-        }
-
-        function undo() {
-            if (undoStack.length > 0) {
-                const prevState = undoStack.pop();
-                clearCanvas();
-                drawBackground(); // Redraw background
-                ctx.putImageData(prevState, 0, 0); // Restore previous drawing state
-                saveCurrentFrameData(); // Update frame data storage
-                saveCurrentFrameThumbnail();
-            }
-            document.getElementById('undo-button').disabled = undoStack.length === 0;
-        }
+        // [saveUndoState, undo, clearUndoStack functions unchanged]
+        function saveUndoState() { if (undoStack.length >= MAX_UNDO_STEPS) { undoStack.shift(); } undoStack.push(ctx.getImageData(0, 0, currentCanvasWidth, currentCanvasHeight)); document.getElementById('undo-button').disabled = false; }
+        function undo() { if (undoStack.length > 0) { const prevState = undoStack.pop(); clearCanvas(); drawBackground(); ctx.putImageData(prevState, 0, 0); saveCurrentFrameData(); saveCurrentFrameThumbnail(); } document.getElementById('undo-button').disabled = undoStack.length === 0; }
+        function clearUndoStack() { undoStack = []; document.getElementById('undo-button').disabled = true; }
 
 
         // --- Frame Management ---
-        function addFrame() {
-            saveCurrentFrameData();
-            frames.splice(currentFrameIndex + 1, 0, createBlankImageData());
-            currentFrameIndex++;
-            loadFrame(currentFrameIndex);
-            updateTimeline();
-            setActiveFrame(currentFrameIndex);
-            clearUndoStack();
-        }
-
-        function duplicateFrame() {
-            saveCurrentFrameData(); // Save current first
-            if (currentFrameIndex < 0 || currentFrameIndex >= frames.length) return;
-
-            const currentImageData = frames[currentFrameIndex];
-            // Create a true copy of the ImageData
-             const duplicateImageData = ctx.createImageData(currentImageData.width, currentImageData.height);
-             duplicateImageData.data.set(currentImageData.data);
-
-            frames.splice(currentFrameIndex + 1, 0, duplicateImageData); // Insert copy after current
-            currentFrameIndex++;
-            loadFrame(currentFrameIndex); // Load the new duplicate frame
-            updateTimeline();
-            setActiveFrame(currentFrameIndex);
-            clearUndoStack();
-        }
-
-        function deleteFrame(indexToDelete) {
-            if (frames.length <= 1) {
-                alert("Cannot delete the last frame!"); return;
-            }
-            if (!confirm(`Delete frame ${indexToDelete + 1}? This cannot be undone.`)) return;
-
-            frames.splice(indexToDelete, 1);
-            currentFrameIndex = Math.min(Math.max(0, currentFrameIndex), frames.length - 1); // Adjust index carefully
-            if (currentFrameIndex >= indexToDelete && indexToDelete > 0) {
-                 currentFrameIndex = indexToDelete - 1; // Prefer selecting previous frame
-            } else {
-                 currentFrameIndex = 0; // Default to first if deleting first
-            }
-
-            loadFrame(currentFrameIndex);
-            updateTimeline();
-            setActiveFrame(currentFrameIndex);
-            clearUndoStack();
-        }
-
-        function selectFrame(index) {
-            if (index === currentFrameIndex || index < 0 || index >= frames.length) return;
-            saveCurrentFrameData(); // Save frame we are leaving
-            currentFrameIndex = index;
-            loadFrame(currentFrameIndex);
-            setActiveFrame(index);
-            clearUndoStack(); // Clear undo when switching frames
-        }
-
-         function clearUndoStack() {
-             undoStack = [];
-             document.getElementById('undo-button').disabled = true;
-         }
-
-        function saveCurrentFrameData() {
-             if (currentFrameIndex >= 0 && currentFrameIndex < frames.length) {
-                 frames[currentFrameIndex] = ctx.getImageData(0, 0, canvas.width, canvas.height);
-             }
-        }
+        // [addFrame, duplicateFrame, deleteFrame, selectFrame, saveCurrentFrameData functions updated slightly for dimensions]
+        function addFrame() { saveCurrentFrameData(); frames.splice(currentFrameIndex + 1, 0, createBlankImageData()); currentFrameIndex++; loadFrame(currentFrameIndex); updateTimeline(); setActiveFrame(currentFrameIndex); clearUndoStack(); clearSelectionRectangle();}
+        function duplicateFrame() { saveCurrentFrameData(); if (currentFrameIndex < 0 || currentFrameIndex >= frames.length) return; const currentImageData = frames[currentFrameIndex]; const duplicateImageData = ctx.createImageData(currentImageData.width, currentImageData.height); duplicateImageData.data.set(currentImageData.data); frames.splice(currentFrameIndex + 1, 0, duplicateImageData); currentFrameIndex++; loadFrame(currentFrameIndex); updateTimeline(); setActiveFrame(currentFrameIndex); clearUndoStack(); clearSelectionRectangle();}
+        function deleteFrame(indexToDelete) { if (frames.length <= 1) { alert("Cannot delete the last frame!"); return; } if (!confirm(`Delete frame ${indexToDelete + 1}? This cannot be undone.`)) return; frames.splice(indexToDelete, 1); currentFrameIndex = Math.min(Math.max(0, currentFrameIndex), frames.length - 1); if (currentFrameIndex >= indexToDelete && indexToDelete > 0) { currentFrameIndex = indexToDelete - 1; } else { currentFrameIndex = 0; } loadFrame(currentFrameIndex); updateTimeline(); setActiveFrame(currentFrameIndex); clearUndoStack(); clearSelectionRectangle();}
+        function selectFrame(index) { if (index === currentFrameIndex || index < 0 || index >= frames.length) return; saveCurrentFrameData(); currentFrameIndex = index; loadFrame(currentFrameIndex); setActiveFrame(index); clearUndoStack(); clearSelectionRectangle();}
+        function saveCurrentFrameData() { if (currentFrameIndex >= 0 && currentFrameIndex < frames.length) { frames[currentFrameIndex] = ctx.getImageData(0, 0, currentCanvasWidth, currentCanvasHeight); } }
 
         function loadFrame(index) {
             if (index < 0 || index >= frames.length) return;
             clearCanvas();
-            drawBackground(); // Draw background first
+            drawBackground(); // Draw background first! Essential for export.
             const frameData = frames[index];
             if (frameData instanceof ImageData) {
                 ctx.putImageData(frameData, 0, 0);
@@ -933,524 +760,81 @@
             currentFrameIndex = index;
             drawOnionSkins();
             clearSelectionRectangle();
+             // console.log(`Frame ${index+1} loaded. Background drawn: ${backgroundImage ? 'Image' : backgroundColor}`); // Verification for export
         }
 
 
         // --- Timeline UI ---
-        function updateTimeline() {
-            const framesContainer = document.getElementById('frames');
-            framesContainer.innerHTML = ''; // Clear
+        // [updateTimeline, generateThumbnail, saveCurrentFrameThumbnail, setActiveFrame functions mostly unchanged]
+        function updateTimeline() { const framesContainer = document.getElementById('frames'); framesContainer.innerHTML = ''; frames.forEach((frameData, index) => { const frameDiv = document.createElement('div'); frameDiv.className = 'frame'; frameDiv.dataset.index = index; const frameNumber = document.createElement('span'); frameNumber.className = 'frame-number'; frameNumber.textContent = index + 1; const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-frame'; deleteBtn.innerHTML = '&times;'; deleteBtn.title = `Delete Frame ${index + 1}`; deleteBtn.onclick = (e) => { e.stopPropagation(); deleteFrame(index); }; frameDiv.appendChild(frameNumber); frameDiv.appendChild(deleteBtn); frameDiv.addEventListener('click', () => selectFrame(index)); generateThumbnail(frameData, frameDiv); framesContainer.appendChild(frameDiv); }); document.getElementById('delete-frame-button').disabled = frames.length <= 1; setActiveFrame(currentFrameIndex); }
+        function generateThumbnail(frameData, frameDiv) { const thumbCanvas = document.createElement('canvas'); const thumbCtx = thumbCanvas.getContext('2d'); const thumbH = 80; const thumbW = thumbH * (currentCanvasWidth / currentCanvasHeight); thumbCanvas.width = thumbW; thumbCanvas.height = thumbH; drawBackground(thumbCtx, thumbW, thumbH); if (frameData instanceof ImageData) { const tempFrameCanvas = document.createElement('canvas'); tempFrameCanvas.width = frameData.width; tempFrameCanvas.height = frameData.height; tempFrameCanvas.getContext('2d').putImageData(frameData, 0, 0); thumbCtx.drawImage(tempFrameCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height); } frameDiv.style.backgroundImage = `url(${thumbCanvas.toDataURL()})`; frameDiv.style.backgroundSize = 'contain'; frameDiv.style.backgroundRepeat = 'no-repeat'; frameDiv.style.backgroundPosition = 'center'; }
+        function saveCurrentFrameThumbnail() { const frameDiv = document.querySelector(`.frame[data-index="${currentFrameIndex}"]`); if (frameDiv && currentFrameIndex >= 0 && currentFrameIndex < frames.length) { generateThumbnail(frames[currentFrameIndex], frameDiv); } }
+        function setActiveFrame(index) { document.querySelectorAll('.frame').forEach(f => f.classList.remove('active-frame')); const activeFrameDiv = document.querySelector(`.frame[data-index="${index}"]`); if (activeFrameDiv) { activeFrameDiv.classList.add('active-frame'); activeFrameDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } }
 
-            frames.forEach((frameData, index) => {
-                const frameDiv = document.createElement('div');
-                frameDiv.className = 'frame';
-                frameDiv.dataset.index = index;
-
-                const frameNumber = document.createElement('span');
-                frameNumber.className = 'frame-number';
-                frameNumber.textContent = index + 1;
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-frame';
-                deleteBtn.innerHTML = '&times;';
-                deleteBtn.title = `Delete Frame ${index + 1}`;
-                deleteBtn.onclick = (e) => {
-                    e.stopPropagation(); deleteFrame(index);
-                };
-
-                frameDiv.appendChild(frameNumber);
-                frameDiv.appendChild(deleteBtn);
-                frameDiv.addEventListener('click', () => selectFrame(index));
-
-                generateThumbnail(frameData, frameDiv); // Generate and set thumbnail bg
-                framesContainer.appendChild(frameDiv);
-            });
-
-             document.getElementById('delete-frame-button').disabled = frames.length <= 1;
-             setActiveFrame(currentFrameIndex); // Re-apply active state
-        }
-
-        function generateThumbnail(frameData, frameDiv) {
-            const thumbCanvas = document.createElement('canvas');
-            const thumbCtx = thumbCanvas.getContext('2d');
-            const thumbSize = 80; // Base size for thumbnail rendering
-            thumbCanvas.width = thumbSize * (canvas.width / canvas.height);
-            thumbCanvas.height = thumbSize;
-
-            // Draw background for thumbnail
-             drawBackground(thumbCtx); // Use helper to draw background on thumb canvas
-
-            // Draw frame content onto thumbnail canvas (scaled)
-            if (frameData instanceof ImageData) {
-                 // Draw ImageData to an intermediate canvas, then draw that scaled
-                 const tempFrameCanvas = document.createElement('canvas');
-                 tempFrameCanvas.width = frameData.width;
-                 tempFrameCanvas.height = frameData.height;
-                 tempFrameCanvas.getContext('2d').putImageData(frameData, 0, 0);
-                 thumbCtx.drawImage(tempFrameCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-            }
-
-            frameDiv.style.backgroundImage = `url(${thumbCanvas.toDataURL()})`;
-            frameDiv.style.backgroundSize = 'contain';
-            frameDiv.style.backgroundRepeat = 'no-repeat';
-            frameDiv.style.backgroundPosition = 'center';
-        }
-
-        function saveCurrentFrameThumbnail() {
-            const frameDiv = document.querySelector(`.frame[data-index="${currentFrameIndex}"]`);
-            if (frameDiv && currentFrameIndex >= 0 && currentFrameIndex < frames.length) {
-                 generateThumbnail(frames[currentFrameIndex], frameDiv);
-            }
-        }
-
-        function setActiveFrame(index) {
-            document.querySelectorAll('.frame').forEach(f => f.classList.remove('active-frame'));
-            const activeFrameDiv = document.querySelector(`.frame[data-index="${index}"]`);
-            if (activeFrameDiv) {
-                activeFrameDiv.classList.add('active-frame');
-                 // Scroll into view smoothly
-                 activeFrameDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            }
-        }
 
         // --- Onion Skinning ---
-         function drawOnionSkins() {
-             clearCanvas(ctxOnionUnder);
-             clearCanvas(ctxOnionOver);
-
-             // Draw previous frames
-             drawOnionSkinLayer(ctxOnionUnder, currentFrameIndex - 1, onionSkinBefore, -1, 'blue');
-             // Draw next frames
-             drawOnionSkinLayer(ctxOnionOver, currentFrameIndex + 1, onionSkinAfter, 1, 'red');
-         }
-
-         function drawOnionSkinLayer(onionCtx, startIndex, count, direction, tint) {
-             const tempOnionCanvas = document.createElement('canvas');
-             tempOnionCanvas.width = canvas.width;
-             tempOnionCanvas.height = canvas.height;
-             const tempOnionCtx = tempOnionCanvas.getContext('2d');
-
-             onionCtx.globalAlpha = 0.5; // Adjust base opacity as needed
-
-             for (let i = 0; i < count; i++) {
-                 const frameIndex = startIndex + (i * direction);
-                 if (frameIndex >= 0 && frameIndex < frames.length) {
-                     const frameData = frames[frameIndex];
-                     if (frameData instanceof ImageData) {
-                          // Draw frame data to temporary canvas
-                         tempOnionCtx.putImageData(frameData, 0, 0);
-
-                          // Apply tint by compositing
-                         tempOnionCtx.globalCompositeOperation = 'source-atop';
-                         tempOnionCtx.fillStyle = tint;
-                         tempOnionCtx.fillRect(0, 0, tempOnionCanvas.width, tempOnionCanvas.height);
-                         tempOnionCtx.globalCompositeOperation = 'source-over'; // Reset
-
-                         // Draw tinted frame onto the actual onion skin canvas
-                         onionCtx.drawImage(tempOnionCanvas, 0, 0);
-
-                         // Optional: Decrease opacity further for frames farther away
-                         // onionCtx.globalAlpha *= 0.7;
-
-                         // Clear temporary canvas for next frame
-                         clearCanvas(tempOnionCtx);
-                     }
-                 } else {
-                     break;
-                 }
-             }
-             onionCtx.globalAlpha = 1.0; // Reset alpha
-         }
+        // [drawOnionSkins, drawOnionSkinLayer functions unchanged]
+         function drawOnionSkins() { clearCanvas(ctxOnionUnder); clearCanvas(ctxOnionOver); drawOnionSkinLayer(ctxOnionUnder, currentFrameIndex - 1, onionSkinBefore, -1, 'blue'); drawOnionSkinLayer(ctxOnionOver, currentFrameIndex + 1, onionSkinAfter, 1, 'red'); }
+         function drawOnionSkinLayer(onionCtx, startIndex, count, direction, tint) { const tempOnionCanvas = document.createElement('canvas'); tempOnionCanvas.width = currentCanvasWidth; tempOnionCanvas.height = currentCanvasHeight; const tempOnionCtx = tempOnionCanvas.getContext('2d'); onionCtx.globalAlpha = 0.5; for (let i = 0; i < count; i++) { const frameIndex = startIndex + (i * direction); if (frameIndex >= 0 && frameIndex < frames.length) { const frameData = frames[frameIndex]; if (frameData instanceof ImageData) { tempOnionCtx.putImageData(frameData, 0, 0); tempOnionCtx.globalCompositeOperation = 'source-atop'; tempOnionCtx.fillStyle = tint; tempOnionCtx.fillRect(0, 0, tempOnionCanvas.width, tempOnionCanvas.height); tempOnionCtx.globalCompositeOperation = 'source-over'; onionCtx.drawImage(tempOnionCanvas, 0, 0); clearCanvas(tempOnionCtx); } } else { break; } } onionCtx.globalAlpha = 1.0; }
 
 
-        // --- Animation Playback ---
-        function playPauseAnimation() {
-            if (isPlaying) {
-                clearInterval(animationInterval);
-                isPlaying = false;
-                document.getElementById('play-pause-button').innerHTML = '▶️ Play';
-                document.getElementById('play-pause-button').title = 'Play Animation';
-                // Re-enable controls disabled during playback
-                 enableControls();
-            } else {
-                isPlaying = true;
-                saveCurrentFrameData(); // Save any pending changes before playback
-                document.getElementById('play-pause-button').innerHTML = '❚❚ Pause';
-                 document.getElementById('play-pause-button').title = 'Pause Animation';
-                 // Disable controls during playback
-                 disableControls();
-
-                let playbackFrameIndex = 0; // Always start from beginning for playback loop
-                loadFrame(playbackFrameIndex); // Show first frame immediately
-                setActiveFrame(playbackFrameIndex);
-
-                animationInterval = setInterval(() => {
-                    playbackFrameIndex = (playbackFrameIndex + 1) % frames.length; // Loop
-                    loadFrame(playbackFrameIndex);
-                    setActiveFrame(playbackFrameIndex);
-                }, 1000 / fps);
-            }
-        }
-
-         function disableControls() {
-             // Disable buttons that shouldn't be used during playback/export
-             document.querySelectorAll('#toolbar button, #timeline-controls button, #file-controls button, #background-controls button').forEach(btn => btn.disabled = true);
-             document.querySelectorAll('#toolbar input, #background-controls input').forEach(input => input.disabled = true);
-             document.getElementById('play-pause-button').disabled = false; // Keep play/pause enabled
-             document.getElementById('export-video-button').disabled = true; // Disable export while playing
-         }
-
-         function enableControls() {
-             document.querySelectorAll('#toolbar button, #timeline-controls button, #file-controls button, #background-controls button').forEach(btn => btn.disabled = false);
-              document.querySelectorAll('#toolbar input, #background-controls input').forEach(input => input.disabled = false);
-             // Re-apply specific disabled states
-             document.getElementById('undo-button').disabled = undoStack.length === 0;
-             document.getElementById('delete-frame-button').disabled = frames.length <= 1;
-             document.getElementById('export-video-button').disabled = false; // Re-enable export
-         }
-
-
-        function updateFps(newFps) {
-             fps = Math.max(1, parseInt(newFps) || 1);
-             document.getElementById('fps-input').value = fps;
-             if (isPlaying) { // Restart playback with new FPS
-                 playPauseAnimation(); playPauseAnimation();
-             }
-        }
+        // --- Animation Playback & Controls Enable/Disable ---
+        // [playPauseAnimation, disableControls, enableControls, updateFps functions unchanged]
+        function playPauseAnimation() { if (isPlaying) { clearInterval(animationInterval); isPlaying = false; document.getElementById('play-pause-button').innerHTML = '▶️ Play'; document.getElementById('play-pause-button').title = 'Play Animation'; enableControls(); } else { isPlaying = true; saveCurrentFrameData(); document.getElementById('play-pause-button').innerHTML = '❚❚ Pause'; document.getElementById('play-pause-button').title = 'Pause Animation'; disableControls(); let playbackFrameIndex = 0; loadFrame(playbackFrameIndex); setActiveFrame(playbackFrameIndex); animationInterval = setInterval(() => { playbackFrameIndex = (playbackFrameIndex + 1) % frames.length; loadFrame(playbackFrameIndex); setActiveFrame(playbackFrameIndex); }, 1000 / fps); } }
+        function disableControls() { document.querySelectorAll('#toolbar button:not(#play-pause-button), #timeline-controls button, .file-control button, .background-control button, #apply-canvas-size').forEach(btn => btn.disabled = true); document.querySelectorAll('#toolbar input, .background-control input, #canvas-width, #canvas-height').forEach(input => input.disabled = true); document.getElementById('play-pause-button').disabled = false; document.getElementById('export-video-button').disabled = true; }
+        function enableControls() { document.querySelectorAll('#toolbar button, #timeline-controls button, .file-control button, .background-control button, #apply-canvas-size').forEach(btn => btn.disabled = false); document.querySelectorAll('#toolbar input, .background-control input, #canvas-width, #canvas-height').forEach(input => input.disabled = false); document.getElementById('undo-button').disabled = undoStack.length === 0; document.getElementById('delete-frame-button').disabled = frames.length <= 1; document.getElementById('export-video-button').disabled = false; pasteButton.disabled = !clipboardData; copyButton.disabled = !selectionActive; }
+        function updateFps(newFps) { fps = Math.max(1, parseInt(newFps) || 1); document.getElementById('fps-input').value = fps; if (isPlaying) { playPauseAnimation(); playPauseAnimation(); } }
 
         // --- Background Handling ---
-        function setBackgroundColor(color) {
-            backgroundColor = color;
-            backgroundImage = null;
-            document.getElementById('bg-color-picker').value = color;
-            loadFrame(currentFrameIndex); // Reload frame with new background
-            updateTimeline(); // Update all thumbnails
-        }
-
-        function setBackgroundImage(file) {
-             const reader = new FileReader();
-             reader.onload = function(e) {
-                 const img = new Image();
-                 img.onload = () => {
-                     backgroundImage = img;
-                     backgroundColor = '#FFFFFF'; // Clear color background
-                     loadFrame(currentFrameIndex);
-                     updateTimeline();
-                 };
-                 img.onerror = () => alert("Failed to load background image.");
-                 img.src = e.target.result;
-             }
-             reader.onerror = () => alert("Failed to read image file.");
-             reader.readAsDataURL(file);
-        }
+        // [setBackgroundColor, setBackgroundImage functions unchanged]
+        function setBackgroundColor(color) { backgroundColor = color; backgroundImage = null; document.getElementById('bg-color-picker').value = color; loadFrame(currentFrameIndex); updateTimeline(); }
+        function setBackgroundImage(file) { const reader = new FileReader(); reader.onload = function(e) { const img = new Image(); img.onload = () => { backgroundImage = img; backgroundColor = '#FFFFFF'; loadFrame(currentFrameIndex); updateTimeline(); }; img.onerror = () => alert("Failed to load background image."); img.src = e.target.result; } reader.onerror = () => alert("Failed to read image file."); reader.readAsDataURL(file); }
 
         // --- Image Import ---
-         function importImage(file) {
-             if (currentFrameIndex < 0 || currentFrameIndex >= frames.length) return;
-             const reader = new FileReader();
-             reader.onload = function(event) {
-                 const img = new Image();
-                 img.onload = () => {
-                      saveUndoState();
-                     // Draw centered or allow user placement later
-                      const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
-                      const drawWidth = img.width * scale;
-                      const drawHeight = img.height * scale;
-                      const drawX = (canvas.width - drawWidth) / 2;
-                      const drawY = (canvas.height - drawHeight) / 2;
-                     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                     saveCurrentFrameData();
-                     saveCurrentFrameThumbnail();
-                 };
-                 img.onerror = () => alert("Failed to load image for import.");
-                 img.src = event.target.result;
-             }
-             reader.onerror = () => alert("Failed to read image file for import.");
-             reader.readAsDataURL(file);
-         }
+        // [importImage function unchanged]
+        function importImage(file) { if (currentFrameIndex < 0 || currentFrameIndex >= frames.length) return; const reader = new FileReader(); reader.onload = function(event) { const img = new Image(); img.onload = () => { saveUndoState(); const scale = Math.min(currentCanvasWidth / img.width, currentCanvasHeight / img.height, 1); const drawWidth = img.width * scale; const drawHeight = img.height * scale; const drawX = (currentCanvasWidth - drawWidth) / 2; const drawY = (currentCanvasHeight - drawHeight) / 2; ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight); saveCurrentFrameData(); saveCurrentFrameThumbnail(); }; img.onerror = () => alert("Failed to load image for import."); img.src = event.target.result; } reader.onerror = () => alert("Failed to read image file for import."); reader.readAsDataURL(file); }
 
         // --- Save/Load Project ---
-        function saveProject() {
-            saveCurrentFrameData(); // Ensure current frame is saved
-            const serializableFrames = frames.map(imageData => {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = imageData.width;
-                tempCanvas.height = imageData.height;
-                tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
-                return tempCanvas.toDataURL(); // PNG Data URL
-            });
-
-            const projectData = {
-                version: 2, // Increment version for new features
-                canvasWidth: canvas.width,
-                canvasHeight: canvas.height,
-                backgroundColor: backgroundColor,
-                backgroundImage: backgroundImage ? backgroundImage.src : null, // Save BG image as Data URL
-                fps: fps,
-                frames: serializableFrames
-            };
-
-            const jsonString = JSON.stringify(projectData);
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `animation_${Date.now()}.animproj`;
-            a.click();
-            URL.revokeObjectURL(url);
-            console.log("Project saved.");
-        }
-
-        function loadProject(file) {
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const projectData = JSON.parse(e.target.result);
-                    if (!projectData || (projectData.version !== 1 && projectData.version !== 2)) {
-                         throw new Error("Invalid or incompatible project file format.");
-                    }
-                    if (!Array.isArray(projectData.frames) || projectData.frames.length === 0) {
-                        throw new Error("Project file contains no frames.");
-                    }
-
-                    // Stop playback
-                    if (isPlaying) playPauseAnimation();
-
-                    // Apply settings
-                    fps = projectData.fps || 12;
-                    backgroundColor = projectData.backgroundColor || '#FFFFFF';
-                    backgroundImage = null; // Reset first
-
-                    // Resize canvas if needed
-                    if (projectData.canvasWidth && projectData.canvasHeight &&
-                        (canvas.width !== projectData.canvasWidth || canvas.height !== projectData.canvasHeight)) {
-                         canvas.width = projectData.canvasWidth;
-                         canvas.height = projectData.canvasHeight;
-                         resizeCanvas(); // This triggers redraw logic internally
-                     }
-
-
-                    // Load Background Image (if saved)
-                     const bgImagePromise = projectData.backgroundImage ? loadImageFromDataURL(projectData.backgroundImage) : Promise.resolve(null);
-
-                     bgImagePromise.then(img => {
-                         backgroundImage = img; // Set loaded background image
-
-                         // Load Frames (after potential resize and background load)
-                         frames = []; // Clear existing frames
-                         const framePromises = projectData.frames.map(dataUrl => loadImageDataFromDataURL(dataUrl));
-
-                         return Promise.all(framePromises); // Wait for all frames to load
-                     })
-                    .then(loadedFrames => {
-                        frames = loadedFrames.filter(f => f instanceof ImageData);
-                        if (frames.length === 0) throw new Error("Could not load any valid frames.");
-
-                         currentFrameIndex = 0;
-                         clearUndoStack();
-                         loadFrame(currentFrameIndex); // Load first frame onto canvas
-                         updateTimeline(); // Update timeline UI
-                         setupUI(); // Reset UI elements to loaded state (pickers, etc.)
-                         console.log("Project loaded successfully.");
-                    })
-                    .catch(error => {
-                         console.error("Error during project load:", error);
-                         alert(`Failed to load project: ${error.message}`);
-                         // Optionally reset to default state
-                         // initialize();
-                     });
-
-                } catch (error) {
-                    console.error("Error parsing project file:", error);
-                    alert("Failed to load project file. It might be invalid or corrupted.\nError: " + error.message);
-                }
-            };
-            reader.onerror = () => alert("Failed to read the project file.");
-            reader.readAsText(file);
-        }
-
-         // Helper to load an Image object from Data URL
-         function loadImageFromDataURL(dataURL) {
-              return new Promise((resolve, reject) => {
-                  const img = new Image();
-                  img.onload = () => resolve(img);
-                  img.onerror = () => {
-                      console.error("Failed to load image from DataURL:", dataURL.substring(0, 50) + "...");
-                      resolve(null); // Resolve null on error
-                  };
-                  img.src = dataURL;
-              });
-         }
-
-
-        // Helper to convert Data URL back to ImageData
-        function loadImageDataFromDataURL(dataURL) {
-             return new Promise((resolve) => { // Removed reject, just resolve null on error
-                 const img = new Image();
-                 img.onload = () => {
-                      // Ensure temp canvas matches loaded image dimensions
-                      const tempCanvas = document.createElement('canvas');
-                      tempCanvas.width = img.naturalWidth;
-                      tempCanvas.height = img.naturalHeight;
-                      const tempCtx = tempCanvas.getContext('2d');
-                      tempCtx.drawImage(img, 0, 0);
-                      // Get ImageData *from the temp canvas*
-                      resolve(tempCtx.getImageData(0, 0, img.naturalWidth, img.naturalHeight));
-                 };
-                 img.onerror = () => {
-                      console.error("Failed to load image for ImageData:", dataURL.substring(0, 50) + "...");
-                      resolve(null); // Resolve null so Promise.all doesn't fail completely
-                 };
-                 img.src = dataURL;
-             });
-        }
+        // [saveProject, loadProject, loadImageFromDataURL, loadImageDataFromDataURL updated for dimensions]
+        function saveProject() { saveCurrentFrameData(); const serializableFrames = frames.map(imageData => { const tempCanvas = document.createElement('canvas'); tempCanvas.width = imageData.width; tempCanvas.height = imageData.height; tempCanvas.getContext('2d').putImageData(imageData, 0, 0); return tempCanvas.toDataURL(); }); const projectData = { version: 3, canvasWidth: currentCanvasWidth, canvasHeight: currentCanvasHeight, backgroundColor: backgroundColor, backgroundImage: backgroundImage ? backgroundImage.src : null, fps: fps, frames: serializableFrames }; const jsonString = JSON.stringify(projectData); const blob = new Blob([jsonString], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `animation_${Date.now()}.animproj`; a.click(); URL.revokeObjectURL(url); console.log("Project saved."); }
+        function loadProject(file) { if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const projectData = JSON.parse(e.target.result); if (!projectData || (projectData.version !== 2 && projectData.version !== 3)) { throw new Error("Incompatible project file version."); } if (!Array.isArray(projectData.frames) || projectData.frames.length === 0) { throw new Error("Project contains no frames."); } if (isPlaying) playPauseAnimation(); const loadedWidth = projectData.canvasWidth || DEFAULT_CANVAS_WIDTH; const loadedHeight = projectData.canvasHeight || DEFAULT_CANVAS_HEIGHT; setCanvasDimensions(loadedWidth, loadedHeight, true); // Force set size, assume user wants loaded size (clears if different) fps = projectData.fps || 12; backgroundColor = projectData.backgroundColor || '#FFFFFF'; backgroundImage = null; const bgImagePromise = projectData.backgroundImage ? loadImageFromDataURL(projectData.backgroundImage) : Promise.resolve(null); bgImagePromise.then(img => { backgroundImage = img; return Promise.all(projectData.frames.map(dataUrl => loadImageDataFromDataURL(dataUrl))); }).then(loadedFrames => { frames = loadedFrames.filter(f => f instanceof ImageData && f.width === currentCanvasWidth && f.height === currentCanvasHeight); if (frames.length === 0) throw new Error("Could not load valid frames matching canvas dimensions."); currentFrameIndex = 0; clearUndoStack(); clipboardData = null; loadFrame(currentFrameIndex); updateTimeline(); setupUI(); console.log("Project loaded successfully."); }).catch(error => { console.error("Error loading project:", error); alert(`Failed to load project: ${error.message}`); initialize(); }); } catch (error) { console.error("Error parsing project file:", error); alert("Failed to load project file. Invalid format?\nError: " + error.message); } }; reader.onerror = () => alert("Failed to read the project file."); reader.readAsText(file); }
+        function loadImageFromDataURL(dataURL) { return new Promise((resolve) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => resolve(null); img.src = dataURL; }); }
+        function loadImageDataFromDataURL(dataURL) { return new Promise((resolve) => { const img = new Image(); img.onload = () => { const tempCanvas = document.createElement('canvas'); tempCanvas.width = img.naturalWidth; tempCanvas.height = img.naturalHeight; const tempCtx = tempCanvas.getContext('2d'); tempCtx.drawImage(img, 0, 0); resolve(tempCtx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)); }; img.onerror = () => resolve(null); img.src = dataURL; }); }
 
 
         // --- Video Export (MediaRecorder) ---
-        function exportVideo() {
-             if (isPlaying) {
-                 alert("Please pause the animation before exporting."); return;
-             }
-             if (frames.length === 0) {
-                 alert("No frames to export."); return;
-             }
-
-             // Check for MediaRecorder support
-             if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) {
-                 alert("Video recording is not supported by your browser."); return;
-             }
-
-             const exportButton = document.getElementById('export-video-button');
-             const statusDiv = document.getElementById('export-status');
-             exportButton.disabled = true;
-             exportButton.textContent = '🎬 Recording...';
-             statusDiv.textContent = 'Starting export...';
-             disableControls(); // Disable other controls
-
-             recordedChunks = []; // Reset chunk array
-             const stream = canvas.captureStream(fps); // Capture at target FPS
-
-             // Try common MIME types
-             const mimeTypes = [
-                 'video/webm;codecs=vp9',
-                 'video/webm;codecs=vp8',
-                 'video/webm',
-                 'video/mp4' // Less likely to be supported directly for canvas recording
-             ];
-             const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
-
-             if (!supportedMimeType) {
-                 alert("No supported video format found for recording (WebM/VP9/VP8 preferred).");
-                 enableControls();
-                 exportButton.disabled = false;
-                 exportButton.textContent = '🎬 Export Video';
-                 statusDiv.textContent = '';
-                 return;
-             }
-
-             console.log("Using MIME type:", supportedMimeType);
-             mediaRecorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
-
-             mediaRecorder.ondataavailable = (event) => {
-                 if (event.data.size > 0) {
-                     recordedChunks.push(event.data);
-                 }
-             };
-
-             mediaRecorder.onstop = () => {
-                 const blob = new Blob(recordedChunks, { type: supportedMimeType });
-                 const url = URL.createObjectURL(blob);
-                 const a = document.createElement("a");
-                 const fileExtension = supportedMimeType.includes('mp4') ? 'mp4' : 'webm';
-                 a.href = url;
-                 a.download = `animation_${Date.now()}.${fileExtension}`;
-                 a.click();
-                 URL.revokeObjectURL(url);
-
-                 // Cleanup and UI reset
-                 stream.getTracks().forEach(track => track.stop()); // Stop stream tracks
-                 mediaRecorder = null;
-                 recordedChunks = [];
-                 enableControls();
-                 exportButton.disabled = false;
-                 exportButton.textContent = '🎬 Export Video';
-                 statusDiv.textContent = 'Export complete!';
-                 setTimeout(() => statusDiv.textContent = '', 3000); // Clear status after a delay
-                 loadFrame(currentFrameIndex); // Restore editor view to current frame
-                 setActiveFrame(currentFrameIndex);
-                 console.log("Recording stopped, video saved.");
-             };
-
-             mediaRecorder.onerror = (event) => {
-                 console.error("MediaRecorder Error:", event.error);
-                 alert(`Video recording failed: ${event.error.name}`);
-                 // Cleanup on error
-                  if (stream) stream.getTracks().forEach(track => track.stop());
-                  mediaRecorder = null;
-                  recordedChunks = [];
-                  enableControls();
-                  exportButton.disabled = false;
-                  exportButton.textContent = '🎬 Export Video';
-                  statusDiv.textContent = 'Export failed.';
-             };
-
-             // Start Recording Process
-             mediaRecorder.start();
-             console.log("Recording started.");
-             let frameToRecord = 0;
-             const recordInterval = setInterval(() => {
-                 if (frameToRecord < frames.length) {
-                     statusDiv.textContent = `Recording frame ${frameToRecord + 1} / ${frames.length}...`;
-                     loadFrame(frameToRecord); // Load frame onto canvas for capture
-                     // captureStream handles timing based on FPS, just need to ensure frame is drawn
-                     frameToRecord++;
-                 } else {
-                     clearInterval(recordInterval);
-                     if (mediaRecorder && mediaRecorder.state === "recording") {
-                         mediaRecorder.stop(); // Stop recording after last frame
-                     }
-                 }
-             }, 1000 / fps); // Interval matches FPS to ensure frames are drawn in time
-
-        }
+        // [exportVideo function unchanged - already includes background]
+        function exportVideo() { if (isPlaying) { alert("Pause animation before exporting."); return; } if (frames.length === 0) { alert("No frames to export."); return; } if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) { alert("Video recording not supported by your browser."); return; } const exportButton = document.getElementById('export-video-button'); const statusDiv = document.getElementById('export-status'); exportButton.disabled = true; exportButton.textContent = '🎬 Recording...'; statusDiv.textContent = 'Starting export...'; disableControls(); recordedChunks = []; const stream = canvas.captureStream(fps); const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']; const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)); if (!supportedMimeType) { alert("No supported video format found (WebM preferred)."); enableControls(); exportButton.disabled = false; exportButton.textContent = '🎬 Export Video'; statusDiv.textContent = ''; return; } console.log("Using MIME type:", supportedMimeType); mediaRecorder = new MediaRecorder(stream, { mimeType: supportedMimeType }); mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); }; mediaRecorder.onstop = () => { const blob = new Blob(recordedChunks, { type: supportedMimeType }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); const fileExtension = supportedMimeType.includes('mp4') ? 'mp4' : 'webm'; a.href = url; a.download = `animation_${Date.now()}.${fileExtension}`; a.click(); URL.revokeObjectURL(url); stream.getTracks().forEach(track => track.stop()); mediaRecorder = null; recordedChunks = []; enableControls(); exportButton.disabled = false; exportButton.textContent = '🎬 Export Video'; statusDiv.textContent = 'Export complete!'; setTimeout(() => statusDiv.textContent = '', 3000); loadFrame(currentFrameIndex); setActiveFrame(currentFrameIndex); console.log("Recording stopped."); }; mediaRecorder.onerror = (event) => { console.error("MediaRecorder Error:", event.error); alert(`Video recording failed: ${event.error.name}`); if (stream) stream.getTracks().forEach(track => track.stop()); mediaRecorder = null; recordedChunks = []; enableControls(); exportButton.disabled = false; exportButton.textContent = '🎬 Export Video'; statusDiv.textContent = 'Export failed.'; }; mediaRecorder.start(); console.log("Recording started."); let frameToRecord = 0; const recordInterval = setInterval(() => { if (frameToRecord < frames.length) { statusDiv.textContent = `Recording frame ${frameToRecord + 1} / ${frames.length}...`; loadFrame(frameToRecord); frameToRecord++; } else { clearInterval(recordInterval); if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); } }, 1000 / fps); }
 
 
         // --- Event Listeners Setup ---
         function setupEventListeners() {
-            // Canvas Mouse Events
-             canvas.addEventListener('mousedown', startAction);
-             canvas.addEventListener('mousemove', performAction);
-             canvas.addEventListener('mouseup', endAction);
-             canvas.addEventListener('mouseleave', endAction); // Stop if mouse leaves canvas
-
-             // Canvas Touch Events
-             canvas.addEventListener('touchstart', startAction, { passive: false });
-             canvas.addEventListener('touchmove', performAction, { passive: false });
-             canvas.addEventListener('touchend', endAction);
-             canvas.addEventListener('touchcancel', endAction);
+            // Canvas Mouse/Touch
+             canvas.addEventListener('mousedown', startAction); canvas.addEventListener('mousemove', performAction); canvas.addEventListener('mouseup', endAction); canvas.addEventListener('mouseleave', endAction);
+             canvas.addEventListener('touchstart', startAction, { passive: false }); canvas.addEventListener('touchmove', performAction, { passive: false }); canvas.addEventListener('touchend', endAction); canvas.addEventListener('touchcancel', endAction);
 
             // Toolbar: Tool Selection
             document.querySelectorAll('.tool').forEach(button => {
                 button.addEventListener('click', (e) => {
                     document.querySelector('.tool.active').classList.remove('active');
-                    const targetButton = e.currentTarget; // Use currentTarget
-                    targetButton.classList.add('active');
+                    const targetButton = e.currentTarget; targetButton.classList.add('active');
                     currentTool = targetButton.id.replace('-tool', '');
                     canvas.style.cursor = (currentTool === 'pen' || currentTool === 'eraser') ? 'crosshair' : (currentTool === 'paint-bucket' ? 'copy' : 'default');
-                    if (currentTool !== 'select') clearSelectionRectangle(); // Clear selection when switching away
+                    if (currentTool !== 'select') clearSelectionRectangle();
+                    else if (selectionActive) selectionActionsDiv.classList.remove('hidden'); // Show actions if selection exists
                 });
             });
 
              // Toolbar: Options
-             document.getElementById('color-picker').addEventListener('input', (e) => currentColor = e.target.value); // Use 'input' for live updates
-             document.getElementById('brush-size').addEventListener('input', (e) => {
-                 brushSize = e.target.value;
-                 document.getElementById('brush-size-label').textContent = brushSize;
-             });
+             document.getElementById('color-picker').addEventListener('input', (e) => currentColor = e.target.value);
+             document.getElementById('brush-size').addEventListener('input', (e) => { brushSize = e.target.value; document.getElementById('brush-size-label').textContent = brushSize; });
 
              // Toolbar: Undo
              document.getElementById('undo-button').addEventListener('click', undo);
+
+             // Toolbar: Selection Actions
+             copyButton.addEventListener('click', copySelection);
+             pasteButton.addEventListener('click', pasteSelection);
 
              // Toolbar: Playback & Export
              document.getElementById('play-pause-button').addEventListener('click', playPauseAnimation);
@@ -1470,37 +854,56 @@
              document.getElementById('onion-skin-before').addEventListener('change', (e) => { onionSkinBefore = Math.max(0, parseInt(e.target.value) || 0); drawOnionSkins(); });
              document.getElementById('onion-skin-after').addEventListener('change', (e) => { onionSkinAfter = Math.max(0, parseInt(e.target.value) || 0); drawOnionSkins(); });
 
+             // Toolbar: Canvas Size Apply
+             document.getElementById('apply-canvas-size').addEventListener('click', () => {
+                 const newWidth = parseInt(document.getElementById('canvas-width').value);
+                 const newHeight = parseInt(document.getElementById('canvas-height').value);
+                 if (newWidth && newHeight && newWidth >= 100 && newHeight >= 100) {
+                     setCanvasDimensions(newWidth, newHeight);
+                 } else {
+                     alert("Please enter valid dimensions (minimum 100x100).");
+                      document.getElementById('canvas-width').value = currentCanvasWidth; // Reset to current valid
+                      document.getElementById('canvas-height').value = currentCanvasHeight;
+                 }
+             });
+
+
              // Timeline Controls
              document.getElementById('add-frame-button').addEventListener('click', addFrame);
              document.getElementById('duplicate-frame-button').addEventListener('click', duplicateFrame);
-             document.getElementById('delete-frame-button').addEventListener('click', () => deleteFrame(currentFrameIndex)); // Delete currently selected
+             document.getElementById('delete-frame-button').addEventListener('click', () => deleteFrame(currentFrameIndex));
 
-             // Window Resize
-             window.addEventListener('resize', resizeCanvas); // Use resizeCanvas directly
+             // Window Resize (adjust overlay positions mainly)
+             window.addEventListener('resize', positionOverlayCanvases);
 
-             // Keyboard Shortcuts (Basic Example)
-             window.addEventListener('keydown', (e) => {
-                // Allow shortcuts only when not typing in input fields
+             // Keyboard Shortcuts
+             window.addEventListener('keydown', (e) => { /* ...unchanged shortcut logic... */
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-                let handled = true;
-                switch (e.key.toLowerCase()) {
-                    case 'p': currentTool = 'pen'; break;
-                    case 'e': currentTool = 'eraser'; break;
-                    case 'b': currentTool = 'paint-bucket'; break;
-                    case 's': currentTool = 'select'; break;
-                     case 'z': if (e.ctrlKey || e.metaKey) undo(); break; // Ctrl/Cmd + Z
-                    default: handled = false;
+                let handled = true; let toolChanged = false;
+                 if (e.ctrlKey || e.metaKey) { // Modifier key shortcuts
+                     switch (e.key.toLowerCase()) {
+                         case 'z': undo(); break;
+                         case 'c': if(selectionActive) copySelection(); break;
+                         case 'v': if(clipboardData) pasteSelection(); break;
+                         default: handled = false;
+                     }
+                 } else { // Tool shortcuts (no modifier)
+                     switch (e.key.toLowerCase()) {
+                         case 'p': currentTool = 'pen'; toolChanged = true; break;
+                         case 'e': currentTool = 'eraser'; toolChanged = true; break;
+                         case 'b': currentTool = 'paint-bucket'; toolChanged = true; break;
+                         case 's': currentTool = 'select'; toolChanged = true; break;
+                         default: handled = false;
+                     }
                  }
-
-                 if (handled) {
-                     e.preventDefault(); // Prevent default browser actions (like saving page with Ctrl+S)
-                     // Update UI to reflect tool change
+                 if (handled) e.preventDefault();
+                 if (toolChanged) {
                      document.querySelectorAll('.tool').forEach(btn => btn.classList.remove('active'));
                      const toolButton = document.getElementById(`${currentTool}-tool`);
                      if (toolButton) toolButton.classList.add('active');
                      canvas.style.cursor = (currentTool === 'pen' || currentTool === 'eraser') ? 'crosshair' : (currentTool === 'paint-bucket' ? 'copy' : 'default');
                      if (currentTool !== 'select') clearSelectionRectangle();
+                     else if (selectionActive) selectionActionsDiv.classList.remove('hidden');
                  }
              });
         }
