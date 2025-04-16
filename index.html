@@ -1,350 +1,375 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Animation App</title>
-<style>
-  body{margin:0;display:flex;flex-direction:column;height:100vh;font-family:sans-serif}
-  #toolbar{display:flex;overflow-x:auto;background:#f0f0f0;padding:5px;align-items:center}
-  #toolbar > *{margin-right:5px}
-  #main{flex:1;display:flex;overflow:hidden}
-  #canvasWrapper{flex:1;position:relative;background:#ccc}
-  canvas{width:100%;height:100%;touch-action:none;background:#fff;display:block}
-  #framesPanel{width:120px;background:#e0e0e0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:5px}
-  .frame{width:100px;height:75px;margin:5px;border:2px solid #999;cursor:pointer;position:relative}
-  .frame.current{border-color:#007BFF}
-  @media (max-width:600px){
-    #framesPanel{flex-direction:row;width:auto;overflow-x:auto;overflow-y:hidden;height:90px}
-    .frame{margin:2px}
-  }
-  #previewCanvas{position:absolute;top:0;left:0;pointer-events:none;opacity:1}
-  #scaleControls{display:none;align-items:center}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animation App</n	>
+  <style>
+    body { margin:0; display:flex; flex-direction:column; height:100vh; font-family:sans-serif; }
+    #toolbar { display:flex; overflow-x:auto; background:#f0f0f0; padding:5px; align-items:center; }
+    #toolbar > * { margin-right:5px; }
+    #main { flex:1; display:flex; overflow:hidden; }
+    #canvasWrapper { flex:1; position:relative; background:#ccc; }
+    canvas { width:100%; height:100%; touch-action:none; background:#fff; display:block; }
+    #framesPanel { width:120px; background:#e0e0e0; overflow-y:auto; display:flex; flex-direction:column; align-items:center; padding:5px; }
+    .frame { width:100px; height:75px; margin:5px; border:2px solid #999; cursor:pointer; position:relative; }
+    .frame.current { border-color:#007BFF; }
+    @media (max-width:600px) {
+      #framesPanel { flex-direction:row; width:auto; overflow-x:auto; overflow-y:hidden; height:90px; }
+      .frame { margin:2px; }
+    }
+    #previewCanvas { position:absolute; top:0; left:0; pointer-events:none; }
+    #scaleControls { display:none; align-items:center; }
+  </style>
 </head>
 <body>
-<div id="toolbar">
-  <button id="penBtn">Pen</button>
-  <button id="eraserBtn">Eraser</button>
-  <button id="bucketBtn">Bucket</button>
-  <button id="selectBtn">Select</button>
-  <button id="undoBtn">Undo</button>
-  <button id="importBtn">Import Image</button>
-  <button id="bgImgBtn">Background Image</button>
-  <input type="color" id="bgColorPicker" title="Background Color">
-  <button id="addFrameBtn">+ Frame</button>
-  <button id="delFrameBtn">- Frame</button>
-  <label>FPS:<input type="number" id="fpsInput" value="12" min="1" style="width:50px"></label>
-  <label>Onion Skin:<input type="checkbox" id="onionCheckbox"></label>
-  <button id="previewBtn">Preview</button>
-  <button id="downloadBtn">Download</button>
-  <button id="saveBtn">Save</button>
-  <button id="loadBtn">Load</button>
-  <div id="scaleControls">
-    <label>Scale:<input type="range" id="scaleSlider" min="10" max="200" value="100"></label>
-    <button id="placeBtn">Place</button>
-    <button id="cancelBtn">Cancel</button>
+  <div id="toolbar">
+    <button id="penBtn">Pen</button>
+    <button id="eraserBtn">Eraser</button>
+    <button id="bucketBtn">Bucket</button>
+    <button id="selectBtn">Select</button>
+    <button id="undoBtn">Undo</button>
+    <button id="importBtn">Import Image</button>
+    <button id="bgImgBtn">Background Image</button>
+    <input type="color" id="bgColorPicker" title="Background Color">
+    <input type="color" id="strokeColorPicker" title="Brush Color" value="#000000">
+    <label>FPS:<input type="number" id="fpsInput" value="12" min="1" style="width:50px"></label>
+    <label>Onion Skin:<input type="checkbox" id="onionCheckbox"></label>
+    <button id="previewBtn">Preview</button>
+    <button id="downloadBtn">Download</button>
+    <button id="saveBtn">Save</button>
+    <button id="loadBtn">Load</button>
+    <button id="addFrameBtn">+ Frame</button>
+    <button id="delFrameBtn">- Frame</button>
+    <div id="scaleControls">
+      <label>Scale:<input type="range" id="scaleSlider" min="10" max="200" value="100"></label>
+      <button id="placeBtn">Place</button>
+      <button id="cancelBtn">Cancel</button>
+    </div>
   </div>
-</div>
-<div id="main">
-  <div id="canvasWrapper">
-    <canvas id="canvas"></canvas>
-    <canvas id="previewCanvas"></canvas>
+  <div id="main">
+    <div id="canvasWrapper">
+      <canvas id="canvas"></canvas>
+      <canvas id="previewCanvas"></canvas>
+    </div>
+    <div id="framesPanel"></div>
   </div>
-  <div id="framesPanel"></div>
-</div>
-<input type="file" id="importInput" accept="image/*" style="display:none">
-<input type="file" id="bgImgInput" accept="image/*" style="display:none">
+  <input type="file" id="importInput" accept="image/*" style="display:none">
+  <input type="file" id="bgImgInput" accept="image/*" style="display:none">
 <script>
-(async()=>{const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
-const previewCanvas=document.getElementById('previewCanvas'),pctx=previewCanvas.getContext('2d');
-let cw=800,ch=600;function resize(){cw=canvas.width=canvas.clientWidth;ch=canvas.height=canvas.clientHeight;previewCanvas.width=cw;previewCanvas.height=ch;}window.addEventListener('resize',resize);resize();
+(async()=>{
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const pctx = previewCanvas.getContext('2d');
 
-let tool='pen',color='#000000',size=4,fps=12,onion=false;
-let frames=[],histories=[],current=0;
-const offscreen=document.createElement('canvas'),offctx=offscreen.getContext('2d');
-let selection=null;
-
-function createEmptyFrame(){
-  let imgData=ctx.createImageData(cw,ch);
-  for(let i=0;i<imgData.data.length;i+=4)imgData.data[i+3]=0;
-  return {imageData:imgData,backgroundColor:'#ffffff',backgroundImage:null};
-}
-function init(){frames=[createEmptyFrame()];histories=[[]];current=0;drawFrame();updateHistory();updateUI();}
-function drawFrame(){
-  const f=frames[current];
-  ctx.clearRect(0,0,cw,ch);
-  if(f.backgroundImage)ctx.drawImage(f.backgroundImage,0,0,cw,ch);
-  else{ctx.fillStyle=f.backgroundColor;ctx.fillRect(0,0,cw,ch);}
-  ctx.putImageData(f.imageData,0,0);
-  if(onion){
-    ctx.globalAlpha=0.3;
-    if(current>0)ctx.putImageData(frames[current-1].imageData,0,0);
-    if(current<frames.length-1)ctx.putImageData(frames[current+1].imageData,0,0);
-    ctx.globalAlpha=1;
+  let cw, ch;
+  function resize() {
+    cw = canvas.width = canvas.clientWidth;
+    ch = canvas.height = canvas.clientHeight;
+    previewCanvas.width = cw;
+    previewCanvas.height = ch;
+    drawFrame();
   }
-}
-function updateHistory(){
-  const snap=ctx.getImageData(0,0,cw,ch);
-  histories[current].push(snap);
-  if(histories[current].length>50)histories[current].shift();
-  frames[current].imageData=snap;
-}
-function switchFrame(idx){
-  frames[current].imageData=ctx.getImageData(0,0,cw,ch);
-  current=idx;histories[current]=histories[current]||[];drawFrame();updateUI();
-}
-function updateUI(){
-  drawThumbnails();
-}
+  window.addEventListener('resize', resize);
+  resize();
 
-function drawThumbnails(){
-  const panel=document.getElementById('framesPanel');panel.innerHTML='';
-  frames.forEach((f,i)=>{
-    const div=document.createElement('div');div.className='frame'+(i===current?' current':'');div.draggable=true;div.dataset.idx=i;
-    const tn=document.createElement('canvas');tn.width=100;tn.height=75;
-    const tctx=tn.getContext('2d');
-    if(f.backgroundImage)tctx.drawImage(f.backgroundImage,0,0,100,75);
-    else{tctx.fillStyle=f.backgroundColor;tctx.fillRect(0,0,100,75);}
-    tctx.putImageData(f.imageData,0,0,0,0,100,75);
-    div.appendChild(tn);panel.appendChild(div);
+  // State
+  let tool = 'pen';
+  let color = '#000000';
+  let size = 4;
+  let fps = 12;
+  let onion = false;
+  let drawing = false;
+  let selecting = false;
+  let selection = null;
 
-    div.addEventListener('click',()=>switchFrame(i));
-    div.addEventListener('dragstart',e=>e.dataTransfer.setData('text',i));
-    div.addEventListener('dragover',e=>e.preventDefault());
-    div.addEventListener('drop',e=>{
-      e.preventDefault();const from=+e.dataTransfer.getData('text'),to=i;
-      const fm=frames.splice(from,1)[0],hm=histories.splice(from,1)[0];
-      frames.splice(to,0,fm);histories.splice(to,0,hm);
-      if(current===from)current=to;
-      else if(from<current&&to>=current)current--;
-      else if(from>current&&to<=current)current++;
-      updateUI();
+  const offscreen = document.createElement('canvas');
+  const offctx = offscreen.getContext('2d');
+  let frames = [], histories = [], current = 0;
+
+  function createEmptyFrame() {
+    const f = document.createElement('canvas');
+    f.width = cw; f.height = ch;
+    return { imageData: ctx.createImageData(cw, ch), backgroundColor: '#ffffff', backgroundImage: null };
+  }
+
+  function drawFrame() {
+    const f = frames[current];
+    ctx.clearRect(0, 0, cw, ch);
+    if (f.backgroundImage) ctx.drawImage(f.backgroundImage, 0, 0, cw, ch);
+    else { ctx.fillStyle = f.backgroundColor; ctx.fillRect(0, 0, cw, ch); }
+    ctx.putImageData(f.imageData, 0, 0);
+    if (onion) {
+      ctx.globalAlpha = 0.3;
+      if (current > 0) ctx.putImageData(frames[current - 1].imageData, 0, 0);
+      if (current < frames.length - 1) ctx.putImageData(frames[current + 1].imageData, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function updateHistory() {
+    const snap = ctx.getImageData(0, 0, cw, ch);
+    histories[current].push(snap);
+    if (histories[current].length > 50) histories[current].shift();
+    frames[current].imageData = snap;
+  }
+
+  function switchFrame(idx) {
+    frames[current].imageData = ctx.getImageData(0, 0, cw, ch);
+    current = idx;
+    histories[current] = histories[current] || [];
+    drawFrame(); updateUI();
+  }
+
+  function updateUI() { drawThumbnails(); }
+
+  function drawThumbnails() {
+    const panel = document.getElementById('framesPanel');
+    panel.innerHTML = '';
+    frames.forEach((f, i) => {
+      const div = document.createElement('div');
+      div.className = 'frame' + (i === current ? ' current' : '');
+      div.draggable = true;
+      div.dataset.idx = i;
+      const tn = document.createElement('canvas');
+      tn.width = 100; tn.height = 75;
+      const tctx = tn.getContext('2d');
+      if (f.backgroundImage) tctx.drawImage(f.backgroundImage, 0, 0, 100, 75);
+      else { tctx.fillStyle = f.backgroundColor; tctx.fillRect(0, 0, 100, 75); }
+      tctx.putImageData(f.imageData, 0, 0, 0, 0, 100, 75);
+      div.appendChild(tn);
+      panel.appendChild(div);
+
+      div.addEventListener('click', () => switchFrame(i));
+      div.addEventListener('dragstart', e => e.dataTransfer.setData('text', i));
+      div.addEventListener('dragover', e => e.preventDefault());
+      div.addEventListener('drop', e => {
+        e.preventDefault();
+        const from = +e.dataTransfer.getData('text'), to = i;
+        const fm = frames.splice(from, 1)[0], hm = histories.splice(from, 1)[0];
+        frames.splice(to, 0, fm); histories.splice(to, 0, hm);
+        if (current === from) current = to;
+        else if (from < current && to >= current) current--;
+        else if (from > current && to <= current) current++;
+        updateUI();
+      });
     });
+  }
+
+  // Flood fill
+  function hexToRgba(h) {
+    const v = parseInt(h.replace('#',''),16);
+    return [(v>>16)&255,(v>>8)&255,v&255,255];
+  }
+  function floodFill(x, y) {
+    const img = ctx.getImageData(0, 0, cw, ch), d = img.data, w = cw, h = ch;
+    const startIdx = (y*w + x)*4;
+    const target = d.slice(startIdx, startIdx+4);
+    const fillColor = hexToRgba(color);
+    if (target.every((v,i) => v===fillColor[i])) return;
+    const stack = [[x,y]];
+    while (stack.length) {
+      const [cx, cy] = stack.pop();
+      let idx = (cy*w+cx)*4;
+      if (cx<0||cx>=w||cy<0||cy>=h) continue;
+      if (!target.every((v,i)=>d[idx+i]===v)) continue;
+      d[idx]=fillColor[0]; d[idx+1]=fillColor[1]; d[idx+2]=fillColor[2]; d[idx+3]=255;
+      stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+    }
+    ctx.putImageData(img,0,0);
+    updateHistory(); drawFrame();
+  }
+
+  // Pointer events
+  canvas.addEventListener('pointerdown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX-rect.left)/rect.width)*cw;
+    const y = ((e.clientY-rect.top)/rect.height)*ch;
+    if (tool==='pen'||tool==='eraser') {
+      updateHistory(); drawing=true;
+      ctx.beginPath(); ctx.moveTo(x,y);
+    } else if (tool==='bucket') {
+      updateHistory(); floodFill(Math.floor(x),Math.floor(y));
+    } else if (tool==='select') {
+      updateHistory(); selecting=true;
+      selection={ x0:x,y0:y,x:x,y:y };
+    }
   });
-}
 
-// Flood fill
-function hexToRgb(h){h=h.replace('#','');const v=parseInt(h,16);return[(v>>16)&255,(v>>8)&255,v&255,255];}
-function floodFill(x,y){
-  const img=ctx.getImageData(0,0,cw,ch),d=img.data,w=cw,h=ch,start=(y*w+x)*4;
-  const tc=[d[start],d[start+1],d[start+2],d[start+3]],fc=hexToRgb(color);
-  if(tc.every((v,i)=>v===fc[i]))return;
-  const stack=[[x,y]];
-  while(stack.length){
-    let [cx,cy]=stack.pop(),px=(cy*w+cx)*4;
-    while(cy>=0&&d[px]===tc[0]&&d[px+1]===tc[1]&&d[px+2]===tc[2]&&d[px+3]===tc[3]){
-      cy--;px=(cy*w+cx)*4;
+  canvas.addEventListener('pointermove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX-rect.left)/rect.width)*cw;
+    const y = ((e.clientY-rect.top)/rect.height)*ch;
+    if (drawing && (tool==='pen'||tool==='eraser')) {
+      ctx.lineTo(x,y);
+      ctx.lineWidth = size;
+      ctx.lineCap = 'round';
+      if (tool==='eraser') { ctx.globalCompositeOperation='destination-out'; ctx.globalAlpha=1; ctx.stroke(); }
+      else { ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; ctx.strokeStyle=color; ctx.stroke(); }
+    } else if (selecting && tool==='select') {
+      selection.x=x; selection.y=y;
+      drawFrame();
+      ctx.strokeStyle='red'; ctx.setLineDash([6]);
+      ctx.strokeRect(Math.min(selection.x0,selection.x), Math.min(selection.y0,selection.y), Math.abs(selection.x-selection.x0), Math.abs(selection.y-selection.y0));
+      ctx.setLineDash([]);
     }
-    cy++;px=(cy*w+cx)*4;
-    let left=false,right=false;
-    while(cy<h&&d[px]===tc[0]&&d[px+1]===tc[1]&&d[px+2]===tc[2]&&d[px+3]===tc[3]){
-      d[px]=fc[0];d[px+1]=fc[1];d[px+2]=fc[2];d[px+3]=255;
-      if(cx>0){
-        if(d[px-4]===tc[0]&&d[px-3]===tc[1]&&d[px-2]===tc[2]&&d[px-1]===tc[3]){
-          if(!left){stack.push([cx-1,cy]);left=true;}
-        } else left=false;
-      }
-      if(cx<w-1){
-        if(d[px+4]===tc[0]&&d[px+5]===tc[1]&&d[px+6]===tc[2]&&d[px+7]===tc[3]){
-          if(!right){stack.push([cx+1,cy]);right=true;}
-        } else right=false;
-      }
-      cy++;px=(cy*w+cx)*4;
+  });
+
+  canvas.addEventListener('pointerup', e => {
+    if (drawing) { drawing=false; updateHistory(); drawFrame(); }
+    else if (selecting) {
+      selecting=false;
+      const x=Math.min(selection.x0,selection.x), y=Math.min(selection.y0,selection.y);
+      const w=Math.abs(selection.x-selection.x0), h=Math.abs(selection.y-selection.y0);
+      if (w<1||h<1) { selection=null; drawFrame(); return; }
+      offscreen.width=w; offscreen.height=h;
+      offctx.putImageData(ctx.getImageData(x,y,w,h),0,0);
+      ctx.clearRect(x,y,w,h); drawFrame();
+      selection={ x,y,w,h,image:offscreen };
+      document.getElementById('scaleControls').style.display='flex';
     }
-  }
-  ctx.putImageData(img,0,0);updateHistory();drawFrame();
-}
+  });
 
-// Pointer events
-canvas.addEventListener('pointerdown',e=>{
-  canvas.setPointerCapture(e.pointerId);
-  const x=Math.floor(e.offsetX/canvas.clientWidth*cw),
-        y=Math.floor(e.offsetY/canvas.clientHeight*ch);
-  if(tool==='pen'||tool==='eraser'){
-    updateHistory();ctx.beginPath();ctx.moveTo(x,y);drawing=true;
-  } else if(tool==='bucket'){updateHistory();floodFill(x,y);}
-  else if(tool==='select'){
-    updateHistory();
-    selection={x,y,w:0,h:0,mode:'select',scale:1};
-  }
-});
-let drawing=false;
-canvas.addEventListener('pointermove',e=>{
-  const x=e.offsetX/canvas.clientWidth*cw,
-        y=e.offsetY/canvas.clientHeight*ch;
-  if(drawing && (tool==='pen'||tool==='eraser')){
-    ctx.lineTo(x,y);
-    ctx.strokeStyle = (tool==='eraser'?'#ffffff':color);
-    ctx.lineWidth = size;
-    ctx.lineCap = 'round';
-    ctx.globalCompositeOperation='source-over';
-    ctx.globalAlpha=1;
-    ctx.stroke();
-  } else if(selection && selection.mode==='select' && e.pressure>0){
-    selection.w = x-selection.x;
-    selection.h = y-selection.y;
-    drawFrame();
-    ctx.strokeStyle='red';ctx.setLineDash([6]);ctx.strokeRect(selection.x,selection.y,selection.w,selection.h);ctx.setLineDash([]);
-  }
-});
-canvas.addEventListener('pointerup',e=>{
-  drawing=false;
-  if(tool==='pen'||tool==='eraser'){
-    updateHistory();drawFrame();
-  } else if(selection && selection.mode==='select'){
-    // finalize selection
-    selection.w = Math.abs(selection.w);
-    selection.h = Math.abs(selection.h);
-    if(selection.w===0||selection.h===0){selection=null;return;}
-    let sx = Math.min(selection.x,selection.x+selection.w);
-    let sy = Math.min(selection.y,selection.y+selection.h);
-    selection.x=sx;selection.y=sy;
-    offscreen.width=selection.w;offscreen.height=selection.h;
-    offctx.putImageData(ctx.getImageData(selection.x,selection.y,selection.w,selection.h),0,0);
-    ctx.clearRect(selection.x,selection.y,selection.w,selection.h);
-    selection.mode='placed';
-    document.getElementById('scaleControls').style.display='flex';
-    drawFrame();
-    ctx.drawImage(offscreen,0,0,selection.w,selection.h,selection.x,selection.y,selection.w,selection.h);
-  }
-});
-
-// Toolbar
-document.getElementById('penBtn').onclick=()=>{tool='pen';ctx.globalCompositeOperation='source-over';};
-document.getElementById('eraserBtn').onclick=()=>{tool='eraser';ctx.globalCompositeOperation='destination-out';};
-document.getElementById('bucketBtn').onclick=()=>{tool='bucket';};
-document.getElementById('selectBtn').onclick=()=>{tool='select';};
-document.getElementById('undoBtn').onclick=()=>{
-  if(histories[current].length>1){
-    histories[current].pop();
-    const img=histories[current].pop();
-    ctx.putImageData(img,0,0);frames[current].imageData=img;histories[current].push(img);
-    drawFrame();updateUI();
-  }
-};
-document.getElementById('importBtn').onclick=()=>document.getElementById('importInput').click();
-document.getElementById('importInput').onchange=e=>{
-  const file=e.target.files[0],url=URL.createObjectURL(file),img=new Image();
-  img.onload=()=>{updateHistory();ctx.drawImage(img,0,0,cw,ch);drawFrame();}
-  img.src=url;
-};
-document.getElementById('bgImgBtn').onclick=()=>document.getElementById('bgImgInput').click();
-document.getElementById('bgImgInput').onchange=e=>{
-  const file=e.target.files[0],url=URL.createObjectURL(file),img=new Image();
-  img.onload=()=>{
-    frames[current].backgroundImage=img;drawFrame();updateHistory();updateUI();
-  };img.src=url;
-};
-document.getElementById('bgColorPicker').onchange=e=>{
-  frames[current].backgroundColor=e.target.value;
-  frames[current].backgroundImage=null;
-  drawFrame();updateHistory();updateUI();
-};
-document.getElementById('addFrameBtn').onclick=()=>{
-  frames[current].imageData=ctx.getImageData(0,0,cw,ch);
-  frames.push(createEmptyFrame());
-  histories.push([]);current=frames.length-1;
-  drawFrame();updateHistory();updateUI();
-};
-document.getElementById('delFrameBtn').onclick=()=>{
-  if(frames.length>1){
-    frames.splice(current,1);histories.splice(current,1);
-    current=Math.max(0,current-1);
-    drawFrame();updateUI();
-  }
-};
-document.getElementById('fpsInput').onchange=e=>fps=+e.target.value;
-document.getElementById('onionCheckbox').onchange=e=>{onion=e.target.checked;drawFrame();};
-
-document.getElementById('scaleSlider').oninput=e=>{
-  selection.scale=e.target.value/100;
-  drawFrame();
-  ctx.drawImage(offscreen,0,0,selection.w,selection.h,selection.x,selection.y,selection.w*selection.scale,selection.h*selection.scale);
-};
-document.getElementById('placeBtn').onclick=()=>{
-  updateHistory();
-  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
-  ctx.drawImage(offscreen,0,0,selection.w,selection.h,selection.x,selection.y,selection.w*selection.scale,selection.h*selection.scale);
-  selection=null;
-  document.getElementById('scaleControls').style.display='none';
-  drawFrame();updateUI();
-};
-document.getElementById('cancelBtn').onclick=()=>{
-  selection=null;
-  document.getElementById('scaleControls').style.display='none';
-  drawFrame();
-};
-
-document.getElementById('previewBtn').onclick=()=>{
-  drawFrame();
-  let idx=0,iv=setInterval(()=>{
-    const f=frames[idx++];
-    pctx.clearRect(0,0,cw,ch);
-    if(f.backgroundImage)pctx.drawImage(f.backgroundImage,0,0,cw,ch);
-    else{pctx.fillStyle=f.backgroundColor;pctx.fillRect(0,0,cw,ch);}
-    pctx.putImageData(f.imageData,0,0);
-    if(idx>=frames.length){clearInterval(iv);pctx.clearRect(0,0,cw,ch);}
-  },1000/fps);
-};
-
-document.getElementById('downloadBtn').onclick=()=>{
-  const tmpC=document.createElement('canvas'),tctx=tmpC.getContext('2d');
-  tmpC.width=cw;tmpC.height=ch;
-  const stream=tmpC.captureStream(fps);
-  const opts=MediaRecorder.isTypeSupported('video/mp4')?{mimeType:'video/mp4'}:{mimeType:'video/webm'};
-  const rec=new MediaRecorder(stream,opts),chunks=[];
-  rec.ondataavailable=e=>chunks.push(e.data);
-  rec.onstop=()=>{
-    const blob=new Blob(chunks,{type:opts.mimeType});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-    a.download='animation.'+(opts.mimeType.includes('mp4')?'mp4':'webm');a.click();
+  // Toolbar actions
+  document.getElementById('penBtn').onclick=()=>{ tool='pen'; };
+  document.getElementById('eraserBtn').onclick=()=>{ tool='eraser'; };
+  document.getElementById('bucketBtn').onclick=()=>{ tool='bucket'; };
+  document.getElementById('selectBtn').onclick=()=>{ tool='select'; };
+  document.getElementById('undoBtn').onclick=()=>{
+    if (histories[current].length>1) {
+      histories[current].pop();
+      const snap=histories[current].pop();
+      ctx.putImageData(snap,0,0);
+      frames[current].imageData=snap;
+      histories[current].push(snap);
+      drawFrame(); updateUI();
+    }
   };
-  rec.start();
-  let i=0,iv=setInterval(()=>{
-    const f=frames[i++];
-    tctx.clearRect(0,0,cw,ch);
-    if(f.backgroundImage)tctx.drawImage(f.backgroundImage,0,0,cw,ch);
-    else{tctx.fillStyle=f.backgroundColor;tctx.fillRect(0,0,cw,ch);}
-    tctx.putImageData(f.imageData,0,0);
-    if(i>=frames.length){clearInterval(iv);rec.stop();}
-  },1000/fps);
-};
+  document.getElementById('importBtn').onclick=()=>document.getElementById('importInput').click();
+  document.getElementById('importInput').onchange=e=>{
+    const file=e.target.files[0], url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{ updateHistory(); ctx.drawImage(img,0,0,cw,ch); drawFrame(); };
+    img.src=url;
+  };
+  document.getElementById('bgImgBtn').onclick=()=>document.getElementById('bgImgInput').click();
+  document.getElementById('bgImgInput').onchange=e=>{
+    const file=e.target.files[0], url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{ frames[current].backgroundImage=img; drawFrame(); updateHistory(); updateUI(); };
+    img.src=url;
+  };
+  document.getElementById('bgColorPicker').onchange=e=>{
+    frames[current].backgroundColor=e.target.value;
+    frames[current].backgroundImage=null;
+    drawFrame(); updateHistory(); updateUI();
+  };
+  document.getElementById('strokeColorPicker').onchange=e=>{ color=e.target.value; };
+  document.getElementById('fpsInput').onchange=e=>fps=+e.target.value;
+  document.getElementById('onionCheckbox').onchange=e=>{ onion=e.target.checked; drawFrame(); };
 
-document.getElementById('saveBtn').onclick=()=>{
-  const proj={fps,frames:frames.map(f=>{
-    const c=document.createElement('canvas'),cctx=c.getContext('2d');
-    c.width=cw;c.height=ch;
-    if(f.backgroundImage)cctx.drawImage(f.backgroundImage,0,0,cw,ch);
-    else{cctx.fillStyle=f.backgroundColor;cctx.fillRect(0,0,cw,ch);}
-    cctx.putImageData(f.imageData,0,0);
-    return {img:c.toDataURL(),bgColor:f.backgroundColor,bgImgSrc:f.backgroundImage?f.backgroundImage.src:null};
-  })};
-  localStorage.setItem('animProj',JSON.stringify(proj));
-  alert('Project saved locally');
-};
-document.getElementById('loadBtn').onclick=async()=>{
-  const data=localStorage.getItem('animProj');
-  if(!data)return alert('No saved project');
-  const proj=JSON.parse(data);
-  frames=[];histories=[];fps=proj.fps;document.getElementById('fpsInput').value=fps;
-  for(const fr of proj.frames){
-    const img=new Image();await new Promise(r=>{img.onload=r;img.src=fr.img;});
-    const bgImg=new Image();if(fr.bgImgSrc)await new Promise(r=>{bgImg.onload=r;bgImg.src=fr.bgImgSrc;});else bgImg=null;
-    ctx.clearRect(0,0,cw,ch);
-    if(bgImg)ctx.drawImage(bgImg,0,0,cw,ch);
-    else{ctx.fillStyle=fr.bgColor;ctx.fillRect(0,0,cw,ch);}
-    ctx.putImageData(ctx.getImageData(0,0,cw,ch),0,0);
-    const dataImg=ctx.getImageData(0,0,cw,ch);
-    frames.push({imageData:dataImg,backgroundColor:fr.bgColor,backgroundImage:bgImg});
-    histories.push([]);current=frames.length-1;
-    updateHistory();
-  }
-  current=0;drawFrame();updateUI();
-};
+  document.getElementById('addFrameBtn').onclick=()=>{
+    frames[current].imageData=ctx.getImageData(0,0,cw,ch);
+    frames.push(createEmptyFrame()); histories.push([]);
+    current=frames.length-1;
+    drawFrame(); updateHistory(); updateUI();
+  };
+  document.getElementById('delFrameBtn').onclick=()=>{
+    if (frames.length>1) {
+      frames.splice(current,1); histories.splice(current,1);
+      current=Math.max(0,current-1);
+      drawFrame(); updateUI();
+    }
+  };
 
-init();})();
+  document.getElementById('scaleSlider').oninput=e=>{
+    const s=e.target.value/100;
+    drawFrame();
+    ctx.drawImage(selection.image,0,0,selection.w,selection.h,selection.x,selection.y,selection.w*s,selection.h*s);
+    selection.scale=s;
+  };
+  document.getElementById('placeBtn').onclick=()=>{
+    updateHistory(); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+    const s=selection.scale||1;
+    ctx.drawImage(selection.image,0,0,selection.w,selection.h,selection.x,selection.y,selection.w*s,selection.h*s);
+    selection=null; document.getElementById('scaleControls').style.display='none';
+    drawFrame(); updateUI();
+  };
+  document.getElementById('cancelBtn').onclick=()=>{
+    selection=null; document.getElementById('scaleControls').style.display='none'; drawFrame();
+  };
+
+  document.getElementById('previewBtn').onclick=()=>{
+    let idx=0;
+    const iv=setInterval(()=>{
+      const f=frames[idx++];
+      pctx.clearRect(0,0,cw,ch);
+      if(f.backgroundImage) pctx.drawImage(f.backgroundImage,0,0,cw,ch);
+      else {pctx.fillStyle=f.backgroundColor;pctx.fillRect(0,0,cw,ch);}      
+      pctx.putImageData(f.imageData,0,0);
+      if(idx>=frames.length){ clearInterval(iv); pctx.clearRect(0,0,cw,ch); }
+    },1000/fps);
+  };
+
+  document.getElementById('downloadBtn').onclick=()=>{
+    const tmp=document.createElement('canvas'), tctx=tmp.getContext('2d');
+    tmp.width=cw; tmp.height=ch;
+    const stream=tmp.captureStream(fps);
+    const opts=MediaRecorder.isTypeSupported('video/mp4')?{mimeType:'video/mp4'}:{mimeType:'video/webm'};
+    const rec=new MediaRecorder(stream,opts), chunks=[];
+    rec.ondataavailable=e=>chunks.push(e.data);
+    rec.onstop=()=>{
+      const blob=new Blob(chunks,{type:opts.mimeType});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download='animation.'+(opts.mimeType.includes('mp4')?'mp4':'webm'); a.click();
+    };
+    rec.start();
+    let i=0;
+    const iv=setInterval(()=>{
+      const f=frames[i++];
+      tctx.clearRect(0,0,cw,ch);
+      if(f.backgroundImage) tctx.drawImage(f.backgroundImage,0,0,cw,ch);
+      else { tctx.fillStyle=f.backgroundColor; tctx.fillRect(0,0,cw,ch); }
+      tctx.putImageData(f.imageData,0,0);
+      if(i>=frames.length){ clearInterval(iv); rec.stop(); }
+    },1000/fps);
+  };
+
+  document.getElementById('saveBtn').onclick=()=>{
+    const proj={ fps, frames: frames.map(f => {
+      const c=document.createElement('canvas'), cctx=c.getContext('2d');
+      c.width=cw; c.height=ch;
+      if(f.backgroundImage) cctx.drawImage(f.backgroundImage,0,0,cw,ch);
+      else { cctx.fillStyle=f.backgroundColor; cctx.fillRect(0,0,cw,ch); }
+      cctx.putImageData(f.imageData,0,0);
+      return { img:c.toDataURL(), bgColor:f.backgroundColor, bgImgSrc: f.backgroundImage?f.backgroundImage.src:null };
+    })};
+    localStorage.setItem('animProj', JSON.stringify(proj));
+    alert('Project saved!');
+  };
+  document.getElementById('loadBtn').onclick=async()=>{
+    const data=localStorage.getItem('animProj');
+    if(!data) return alert('No saved project');
+    const proj=JSON.parse(data);
+    frames=[]; histories=[]; fps=proj.fps; document.getElementById('fpsInput').value=fps;
+    for(const fr of proj.frames){
+      const img=new Image(); await new Promise(r=>{img.onload=r; img.src=fr.img;});
+      const bg=new Image(); if(fr.bgImgSrc) await new Promise(r=>{bg.onload=r; bg.src=fr.bgImgSrc;}); else bg=null;
+      ctx.clearRect(0,0,cw,ch);
+      if(bg) ctx.drawImage(bg,0,0,cw,ch);
+      else { ctx.fillStyle=fr.bgColor; ctx.fillRect(0,0,cw,ch); }
+      ctx.putImageData(ctx.getImageData(0,0,cw,ch),0,0);
+      frames.push({ imageData: ctx.getImageData(0,0,cw,ch), backgroundColor: fr.bgColor, backgroundImage: bg });
+      histories.push([]); current=frames.length-1; updateHistory();
+    }
+    current=0; drawFrame(); updateUI();
+  };
+
+  // Init
+  frames=[createEmptyFrame()]; histories=[[]]; current=0;
+  drawFrame(); updateHistory(); updateUI();
+})();
 </script>
 </body>
 </html>
+
 
